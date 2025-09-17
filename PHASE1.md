@@ -3,14 +3,15 @@
 ## Overview
 Phase 1 establishes the core foundation with deterministic rules-based flow, delivering a working MVP without AI dependencies. Total estimated effort: 20 story points (~40-80 hours).
 
-### [P1-001] Project Initialization & Setup
+### [P1-001] Project Initialization & Setup ✅
 **Story Points:** 1
 **Dependencies:** None
+**Status:** COMPLETE
 **Acceptance Criteria:**
-- [ ] Next.js 15.4 project created with TypeScript and Tailwind
-- [ ] All required dependencies installed (AI SDK 5, shadcn/ui, Radix UI)
-- [ ] Project structure established per architecture diagram
-- [ ] Environment variables configured (.env.local)
+- [x] Next.js 15.4 project created with TypeScript and Tailwind
+- [x] All required dependencies installed (AI SDK 5, shadcn/ui, Radix UI)
+- [x] Project structure established per architecture diagram
+- [x] Environment variables configured (.env.local)
 **Technical Notes:**
 - Use `bun` for package management
 - Initialize with App Router, not Pages Router
@@ -18,14 +19,15 @@ Phase 1 establishes the core foundation with deterministic rules-based flow, del
 **Risks:**
 - Version compatibility issues between dependencies
 
-### [P1-002] Core Type Definitions - Fields
+### [P1-002] Core Type Definitions - Fields ✅
 **Story Points:** 1
 **Dependencies:** [P1-001]
+**Status:** COMPLETE
 **Acceptance Criteria:**
-- [ ] TextField, RadioField, CheckboxField, SelectField types defined
-- [ ] Field union type created
-- [ ] Type exports properly configured
-- [ ] JSDoc comments added for clarity
+- [x] TextField, RadioField, CheckboxField, SelectField types defined
+- [x] Field union type created
+- [x] Type exports properly configured
+- [x] JSDoc comments added for clarity
 **Technical Notes:**
 - Use discriminated unions with `kind` field
 - Include all validation properties (required, pattern, etc.)
