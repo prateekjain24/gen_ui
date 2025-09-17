@@ -1,7 +1,10 @@
 /**
- * Form Field Type Definitions
+ * Form Type Definitions
  *
- * This module defines the core types for the dynamic form system.
+ * This module defines the core types for the dynamic form system including:
+ * - Field types (TextField, SelectField, RadioField, CheckboxField)
+ * - Form structure types (FormStep, FormPlan)
+ * - UI state types (StepperItem, ButtonAction)
  * Uses discriminated unions with a 'kind' field for type safety.
  */
 
@@ -209,3 +212,126 @@ export const hasFieldValue = (field: Field): boolean => {
   }
   return value !== undefined && value !== '';
 };
+
+// ============================================================================
+// Form Structure Types
+// ============================================================================
+
+/**
+ * Represents a button action in the form flow
+ */
+export interface ButtonAction {
+  /** Display text for the button */
+  label: string;
+  /** Action to perform when clicked */
+  action: 'submit_step' | 'back' | 'skip' | 'complete';
+}
+
+/**
+ * Represents a single step in the form flow
+ * @example
+ * ```typescript
+ * const basicsStep: FormStep = {
+ *   stepId: 'basics',
+ *   title: 'Welcome! Let's get started',
+ *   description: 'Tell us about yourself',
+ *   fields: [nameField, roleField],
+ *   primaryCta: { label: 'Continue', action: 'submit_step' },
+ *   secondaryCta: { label: 'Skip', action: 'skip' }
+ * };
+ * ```
+ */
+export interface FormStep {
+  /** Unique identifier for the step */
+  stepId: string;
+  /** Display title for the step */
+  title: string;
+  /** Optional description or subtitle */
+  description?: string;
+  /** Array of fields to display in this step */
+  fields: Field[];
+  /** Primary call-to-action button */
+  primaryCta: ButtonAction;
+  /** Optional secondary action button */
+  secondaryCta?: ButtonAction;
+}
+
+/**
+ * Represents an item in the progress stepper UI
+ */
+export interface StepperItem {
+  /** Step identifier */
+  id: string;
+  /** Display label for the step */
+  label: string;
+  /** Whether this step is currently active */
+  active: boolean;
+  /** Whether this step has been completed */
+  completed: boolean;
+}
+
+/**
+ * Represents the current form plan/state
+ * Uses discriminated union for different flow states
+ */
+export type FormPlan =
+  | {
+      /** Render a form step */
+      kind: 'render_step';
+      /** The step to render */
+      step: FormStep;
+      /** Progress stepper state */
+      stepper: StepperItem[];
+    }
+  | {
+      /** Show review/summary screen */
+      kind: 'review';
+      /** Summary items to display */
+      summary: Array<{ label: string; value: string }>;
+      /** Progress stepper state */
+      stepper: StepperItem[];
+    }
+  | {
+      /** Show success state */
+      kind: 'success';
+      /** Success message to display */
+      message: string;
+    }
+  | {
+      /** Show error state */
+      kind: 'error';
+      /** Error message to display */
+      message: string;
+    };
+
+/**
+ * Type guard to check if plan is render_step
+ * @param plan - The plan to check
+ * @returns True if the plan is render_step type
+ */
+export const isRenderStepPlan = (plan: FormPlan): plan is Extract<FormPlan, { kind: 'render_step' }> =>
+  plan.kind === 'render_step';
+
+/**
+ * Type guard to check if plan is review
+ * @param plan - The plan to check
+ * @returns True if the plan is review type
+ */
+export const isReviewPlan = (plan: FormPlan): plan is Extract<FormPlan, { kind: 'review' }> =>
+  plan.kind === 'review';
+
+/**
+ * Type guard to check if plan is success
+ * @param plan - The plan to check
+ * @returns True if the plan is success type
+ */
+export const isSuccessPlan = (plan: FormPlan): plan is Extract<FormPlan, { kind: 'success' }> =>
+  plan.kind === 'success';
+
+/**
+ * Type guard to check if plan is error
+ * @param plan - The plan to check
+ * @returns True if the plan is error type
+ */
+export const isErrorPlan = (plan: FormPlan): plan is Extract<FormPlan, { kind: 'error' }> =>
+  plan.kind === 'error';
