@@ -35,7 +35,9 @@ const baseSession = (): SessionState => ({
   lastActivityAt: new Date('2025-01-01T00:05:00Z'),
   currentStep: 'basics',
   completedSteps: [],
-  values: {},
+  values: {
+    workspace_name: 'Existing Workspace',
+  },
   events: [],
 });
 
@@ -156,7 +158,14 @@ describe('generatePlanWithLLM', () => {
 
     const result = await generatePlanWithLLM(baseSession());
 
-    expect(result).toEqual(plan);
+    expect(result?.kind).toBe('render_step');
+    if (!result || result.kind !== 'render_step') {
+      throw new Error('Expected render_step result');
+    }
+    expect(result.step.fields[0]).toMatchObject({
+      id: 'workspace_name',
+      value: 'Existing Workspace',
+    });
     expect(clientMocks.getOpenAIProvider).toHaveBeenCalledTimes(1);
     expect(provider).toHaveBeenCalledWith('gpt-5-mini-test');
     expect(generateTextMock).toHaveBeenCalledTimes(1);

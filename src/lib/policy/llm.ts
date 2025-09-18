@@ -12,6 +12,7 @@ import {
   shouldRetryOnError,
 } from '@/lib/llm/client';
 import { buildLLMUserContext, formatLLMUserContext } from '@/lib/llm/context';
+import { enhancePlanWithContext } from '@/lib/llm/field-enhancer';
 import { LLMResponseValidationError, parseLLMDecisionFromText } from '@/lib/llm/response-parser';
 import { recordLLMUsage } from '@/lib/llm/usage-tracker';
 import type { FormPlan } from '@/lib/types/form';
@@ -114,7 +115,9 @@ export async function generatePlanWithLLM(session: SessionState): Promise<FormPl
     const parsed = parseLLMDecisionFromText(responseText, session);
     debug(`LLM decision parsed with confidence ${parsed.metadata.confidence}`);
 
-    return parsed.plan;
+    const enhancedPlan = enhancePlanWithContext(parsed.plan, session, parsed.metadata.persona);
+
+    return enhancedPlan;
   } catch (error) {
     if (error instanceof LLMResponseValidationError) {
       debugError('LLM response validation failed', error);
