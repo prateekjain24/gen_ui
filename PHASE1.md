@@ -48,27 +48,29 @@ Phase 1 establishes the core foundation with deterministic rules-based flow, del
 **Risks:**
 - Plan structure may need adjustment based on UI needs
 
-### [P1-004] Session State Types & Events
+### [P1-004] Session State Types & Events ✅
 **Story Points:** 1
 **Dependencies:** [P1-002]
+**Status:** COMPLETE
 **Acceptance Criteria:**
-- [ ] SessionState type with all properties defined
-- [ ] UXEvent discriminated union for all event types
-- [ ] Event timestamp handling standardized
-- [ ] Type guards implemented where needed
+- [x] SessionState type with all properties defined
+- [x] UXEvent discriminated union for all event types
+- [x] Event timestamp handling standardized
+- [x] Type guards implemented where needed
 **Technical Notes:**
 - Keep event payloads minimal for memory efficiency
 **Risks:**
 - Event schema may evolve during implementation
 
-### [P1-005] Constants & Configuration Module
+### [P1-005] Constants & Configuration Module ✅
 **Story Points:** 1
 **Dependencies:** [P1-001]
+**Status:** COMPLETE
 **Acceptance Criteria:**
-- [ ] Field IDs enum created and whitelisted
-- [ ] Option arrays for roles, use cases, templates defined
-- [ ] LLM configuration constants set (for future use)
-- [ ] All constants frozen with `as const`
+- [x] Field IDs enum created and whitelisted
+- [x] Option arrays for roles, use cases, templates defined
+- [x] LLM configuration constants set (for future use)
+- [x] All constants frozen with `as const`
 **Technical Notes:**
 - Use TypeScript const assertions for type safety
 - Group related constants together
