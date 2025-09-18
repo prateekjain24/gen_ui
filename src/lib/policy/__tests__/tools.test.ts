@@ -1,5 +1,5 @@
-import { FIELD_ID_LIST } from '@/lib/constants/fields';
 import { STEP_IDS } from '@/lib/constants';
+import { FIELD_ID_LIST } from '@/lib/constants/fields';
 import { ONBOARDING_TOOLS, proposeNextStepTool } from '@/lib/policy/tools';
 
 describe('propose_next_step tool schema', () => {

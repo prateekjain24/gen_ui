@@ -129,7 +129,9 @@ describe('generatePlanWithLLM', () => {
     const clientMocks = getClientMocks();
     clientMocks.retryWithExponentialBackoff.mockRejectedValue(new Error('network failure'));
 
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleErrorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation((..._args: unknown[]) => undefined);
 
     const { generatePlanWithLLM } = await import('@/lib/policy/llm');
 

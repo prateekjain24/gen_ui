@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
+import console from 'node:console';
+import process from 'node:process';
 
 const child = spawn('bun', ['run', 'dev'], {
   env: {
@@ -15,7 +17,6 @@ child.on('exit', code => {
 });
 
 child.on('error', error => {
-  // eslint-disable-next-line no-console
   console.error('Failed to launch dev server with debug flag.', error);
   process.exit(1);
 });

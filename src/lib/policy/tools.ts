@@ -1,5 +1,5 @@
-import { FIELD_ID_LIST } from '@/lib/constants/fields';
 import { STEP_IDS } from '@/lib/constants';
+import { FIELD_ID_LIST } from '@/lib/constants/fields';
 
 const FIELD_KIND_ENUM = ['text', 'select', 'radio', 'checkbox'] as const;
 const CTA_ACTION_ENUM = ['submit_step', 'back', 'skip', 'complete'] as const;
