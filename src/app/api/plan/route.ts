@@ -13,10 +13,10 @@ const debug = createDebugger('PlanAPI');
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { sessionId } = body;
+    const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+    const rawSessionId = typeof body?.sessionId === 'string' ? body.sessionId.trim() : '';
 
-    if (!sessionId) {
+    if (!rawSessionId) {
       return NextResponse.json(
         {
           error: 'Session ID is required',
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get session from store
-    const session = sessionStore.getSession(sessionId);
+    const session = sessionStore.getSession(rawSessionId);
     if (!session) {
       return NextResponse.json(
         {
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    debug(`Generated plan for session ${sessionId}: ${plan.kind}`);
+    debug(`Generated plan for session ${rawSessionId}: ${plan.kind}`);
 
     return NextResponse.json({
       plan,
