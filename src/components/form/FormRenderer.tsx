@@ -16,9 +16,9 @@ import { cn } from '@/lib/utils';
 interface FormRendererProps {
   plan: FormPlan;
   onAction?: (action: ButtonAction['action'], values: Record<string, unknown>) => void;
-  onFieldChange?: (fieldId: string, value: string | string[] | undefined) => void;
-  onFieldFocus?: (fieldId: string) => void;
-  onFieldBlur?: (fieldId: string) => void;
+  onFieldChange?: (fieldId: string, value: string | string[] | undefined, stepId: string) => void;
+  onFieldFocus?: (fieldId: string, stepId: string) => void;
+  onFieldBlur?: (fieldId: string, stepId: string) => void;
   isSubmitting?: boolean;
   error?: string | null;
   className?: string;
@@ -111,9 +111,13 @@ export function FormRenderer({
     setFieldValues(getInitialFieldValues(plan.step.fields));
   }, [isRenderStep, activeStepId, fieldSignature, plan]);
 
-  const handleValueChange = (fieldId: string, value: string | string[] | undefined) => {
+  const handleValueChange = (
+    fieldId: string,
+    value: string | string[] | undefined,
+    stepId: string
+  ) => {
     setFieldValues(current => ({ ...current, [fieldId]: value ?? '' }));
-    onFieldChange?.(fieldId, value);
+    onFieldChange?.(fieldId, value, stepId);
   };
 
   const handleAction = (action: ButtonAction['action']) => {
@@ -144,10 +148,11 @@ export function FormRenderer({
             <FieldComponent
               key={field.id}
               field={field}
+              stepId={step.stepId}
               value={fieldValues[field.id]}
-              onValueChange={value => handleValueChange(field.id, value)}
-              onFocus={onFieldFocus}
-              onBlur={onFieldBlur}
+              onValueChange={value => handleValueChange(field.id, value, step.stepId)}
+              onFocus={(fieldId, stepId) => onFieldFocus?.(fieldId, stepId)}
+              onBlur={(fieldId, stepId) => onFieldBlur?.(fieldId, stepId)}
             />
           ))}
         </FormContainer>

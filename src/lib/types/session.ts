@@ -113,6 +113,9 @@ export interface UpdateSessionOptions {
   /** Add a completed step */
   addCompletedStep?: string;
 
+  /** Replace the completed steps list */
+  completedSteps?: string[];
+
   /** Merge new values with existing */
   values?: Record<string, unknown>;
 

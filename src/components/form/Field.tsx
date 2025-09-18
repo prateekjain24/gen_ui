@@ -12,10 +12,11 @@ import { cn } from '@/lib/utils';
 
 export interface FieldProps {
   field: FormField;
+  stepId: string;
   value?: string | string[];
   onValueChange: (value: string | string[] | undefined) => void;
-  onFocus?: (fieldId: string) => void;
-  onBlur?: (fieldId: string) => void;
+  onFocus?: (fieldId: string, stepId: string) => void;
+  onBlur?: (fieldId: string, stepId: string) => void;
 }
 
 const HelperText = ({ id, children }: { id?: string; children?: React.ReactNode }) => {
@@ -40,7 +41,7 @@ const ErrorText = ({ id, children }: { id?: string; children?: React.ReactNode }
   );
 };
 
-export function Field({ field, value, onValueChange, onFocus, onBlur }: FieldProps) {
+export function Field({ field, stepId, value, onValueChange, onFocus, onBlur }: FieldProps) {
   const describedById = field.helperText ? `${field.id}-description` : undefined;
   const errorId = field.errorMessage ? `${field.id}-error` : undefined;
   const ariaDescribedBy = [errorId, describedById].filter(Boolean).join(' ') || undefined;
@@ -67,8 +68,8 @@ export function Field({ field, value, onValueChange, onFocus, onBlur }: FieldPro
             autoComplete={field.autocomplete}
             aria-describedby={ariaDescribedBy}
             aria-invalid={Boolean(field.errorMessage)}
-            onFocus={() => onFocus?.(field.id)}
-            onBlur={() => onBlur?.(field.id)}
+            onFocus={() => onFocus?.(field.id, stepId)}
+            onBlur={() => onBlur?.(field.id, stepId)}
             onChange={event => onValueChange(event.target.value)}
           />
           <HelperText id={describedById}>{field.helperText}</HelperText>
@@ -105,8 +106,8 @@ export function Field({ field, value, onValueChange, onFocus, onBlur }: FieldPro
                     id={optionId}
                     value={option.value}
                     disabled={field.disabled || option.disabled}
-                    onFocus={() => onFocus?.(field.id)}
-                    onBlur={() => onBlur?.(field.id)}
+                    onFocus={() => onFocus?.(field.id, stepId)}
+                    onBlur={() => onBlur?.(field.id, stepId)}
                     className="mt-1"
                   />
                   <span className="grid gap-1">
@@ -155,8 +156,8 @@ export function Field({ field, value, onValueChange, onFocus, onBlur }: FieldPro
                         : selectedValues.filter(item => item !== option.value);
                       onValueChange(nextValues);
                     }}
-                    onFocus={() => onFocus?.(field.id)}
-                    onBlur={() => onBlur?.(field.id)}
+                    onFocus={() => onFocus?.(field.id, stepId)}
+                    onBlur={() => onBlur?.(field.id, stepId)}
                     className="mt-1"
                   />
                   <span className="grid gap-1">
@@ -192,8 +193,8 @@ export function Field({ field, value, onValueChange, onFocus, onBlur }: FieldPro
               id={field.id}
               aria-describedby={ariaDescribedBy}
               aria-invalid={Boolean(field.errorMessage)}
-              onFocus={() => onFocus?.(field.id)}
-              onBlur={() => onBlur?.(field.id)}
+              onFocus={() => onFocus?.(field.id, stepId)}
+              onBlur={() => onBlur?.(field.id, stepId)}
             >
               <SelectValue placeholder={field.placeholder ?? 'Select option'} />
             </SelectTrigger>

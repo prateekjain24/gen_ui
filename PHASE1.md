@@ -241,47 +241,50 @@ Phase 1 establishes the core foundation with deterministic rules-based flow, del
 **Risks:**
 - Complex styling across browsers (continue visual QA as branding evolves)
 
-### [P1-017] Onboarding Flow Orchestrator
+### [P1-017] Onboarding Flow Orchestrator ✅
 **Story Points:** 1
 **Dependencies:** [P1-015, P1-012]
+**Status:** COMPLETE
 **Acceptance Criteria:**
-- [ ] Main flow component with state management
-- [ ] API integration for plan fetching
-- [ ] Form value collection and persistence
-- [ ] Navigation between steps working
+- [x] Main flow component with state management
+- [x] API integration for plan fetching
+- [x] Form value collection and persistence
+- [x] Navigation between steps working
 **Technical Notes:**
-- Use React state for local values
-- Implement proper error boundaries
+- `OnboardingFlow` now persists sessions, requests `/api/plan`, and routes actions through session updates with loading/error UX
+- Added client API helpers and session update enhancements (completed-step replacement) to support back/skip flows
 **Risks:**
-- State synchronization issues
+- State synchronization issues (watch for concurrent fetches when Phase 2 AI branching arrives)
 
-### [P1-018] Event Tracking Integration
+### [P1-018] Event Tracking Integration ✅
 **Story Points:** 1
 **Dependencies:** [P1-017, P1-013]
+**Status:** COMPLETE
 **Acceptance Criteria:**
-- [ ] Field focus/blur tracking
-- [ ] Value change tracking
-- [ ] Step submission tracking
-- [ ] Event batching with 1-second delay
+- [x] Field focus/blur tracking
+- [x] Value change tracking
+- [x] Step submission tracking
+- [x] Event batching with 1-second delay
 **Technical Notes:**
-- Use debouncing for change events
-- Queue events to reduce API calls
+- Added client-side telemetry queue with beacon fallback and integrated focus/change/step events into `OnboardingFlow`
+- Telemetry flushes on unmount and navigation, preserving change counts and dwell times per step
 **Risks:**
-- Event loss on page unload
+- Event loss on page unload (beacon mitigates but still monitor)
 
-### [P1-019] Basic Testing Suite
+### [P1-019] Basic Testing Suite ✅
 **Story Points:** 1
 **Dependencies:** [P1-009, P1-010, P1-011]
+**Status:** COMPLETE
 **Acceptance Criteria:**
-- [ ] Unit tests for Rules Engine
-- [ ] Session Store tests
-- [ ] Type validation tests
-- [ ] 80% code coverage achieved
+- [x] Unit tests for Rules Engine
+- [x] Session Store tests
+- [x] Type validation tests
+- [x] 80% code coverage achieved
 **Technical Notes:**
-- Use Jest and React Testing Library
-- Mock API calls appropriately
+- Extended session store/telemetry/orchestrator coverage and added helper API tests with Jest coverage instrumentation (≥88%)
+- Coverage command documented via `bunx jest --coverage`
 **Risks:**
-- Test maintenance overhead
+- Test maintenance overhead (keep mocks in sync with evolving APIs)
 
 ### [P1-020] Development Environment & Documentation
 **Story Points:** 1

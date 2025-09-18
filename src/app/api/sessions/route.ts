@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { sessionId, values, currentStep, addCompletedStep } = body;
+    const { sessionId, values, currentStep, addCompletedStep, completedSteps } = body;
 
     if (!sessionId) {
       return NextResponse.json(
@@ -97,6 +97,7 @@ export async function PUT(req: NextRequest) {
       values,
       currentStep,
       addCompletedStep,
+      completedSteps,
     });
 
     if (!session) {

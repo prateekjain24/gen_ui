@@ -157,7 +157,9 @@ class SessionStore {
       session.currentStep = options.currentStep;
     }
 
-    if (options.addCompletedStep !== undefined) {
+    if (options.completedSteps !== undefined) {
+      session.completedSteps = [...options.completedSteps];
+    } else if (options.addCompletedStep !== undefined) {
       if (!session.completedSteps.includes(options.addCompletedStep)) {
         session.completedSteps.push(options.addCompletedStep);
       }

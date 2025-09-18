@@ -85,6 +85,24 @@ describe('SessionStore', () => {
       expect(updated?.persona).toBe('team');
     });
 
+    test('should replace completed steps when provided', () => {
+      const session = sessionStore.createSession();
+
+      sessionStore.updateSession(session.id, {
+        addCompletedStep: 'basics',
+      });
+
+      const intermediate = sessionStore.getSession(session.id);
+      expect(intermediate?.completedSteps).toEqual(['basics']);
+
+      sessionStore.updateSession(session.id, {
+        completedSteps: ['workspace'],
+      });
+
+      const updated = sessionStore.getSession(session.id);
+      expect(updated?.completedSteps).toEqual(['workspace']);
+    });
+
     test('should merge values on update', () => {
       const session = sessionStore.createSession({
         initialValues: { name: 'Test' },
