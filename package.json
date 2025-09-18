@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
-    "start": "next start"
+    "start": "next start",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",
@@ -21,19 +24,32 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "tailwind-merge": "^3.3.1",
-    "uuid": "^13.0.0",
+    "uuid": "9.0.1",
     "zod": "^4.1.9"
   },
   "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "@next/eslint-plugin-next": "^15.5.3",
     "@tailwindcss/postcss": "^4",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/uuid": "^11.0.0",
+    "@types/uuid": "9.0.8",
+    "@typescript-eslint/eslint-plugin": "^8.44.0",
+    "@typescript-eslint/parser": "^8.44.0",
+    "eslint": "^9.35.0",
+    "eslint-config-next": "^15.5.3",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "jest": "^30.1.3",
     "prettier": "^3.6.2",
     "shadcn": "^3.3.1",
     "tailwindcss": "^4",
+    "ts-jest": "^29.4.2",
     "tw-animate-css": "^1.3.8",
     "typescript": "^5"
   }
