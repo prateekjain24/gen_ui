@@ -181,19 +181,20 @@ Phase 1 establishes the core foundation with deterministic rules-based flow, del
 **Risks:**
 - Session race conditions possible
 
-### [P1-013] Basic API Route - Events Endpoint
+### [P1-013] Basic API Route - Events Endpoint ✅
 **Story Points:** 1
 **Dependencies:** [P1-007]
+**Status:** COMPLETE
 **Acceptance Criteria:**
-- [ ] POST /api/events endpoint created
-- [ ] Batch event processing implemented
-- [ ] Basic pattern analysis working
-- [ ] Response includes insights
+- [x] POST /api/events endpoint created
+- [x] Batch event processing implemented
+- [x] Basic pattern analysis working
+- [x] Response includes insights
 **Technical Notes:**
-- Process events asynchronously
-- Keep analysis lightweight
+- Normalized payloads with Zod, capped batches to session max, and reused analyzer helper for insights
+- Logging via `createDebugger('EventsAPI')` to trace ingestion outcomes
 **Risks:**
-- Event ordering may be important
+- Event ordering may be important for richer analytics; current heuristics assume approximate chronology
 
 ### [P1-014] UI Component - Field Renderer
 **Story Points:** 1
