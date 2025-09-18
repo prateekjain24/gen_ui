@@ -275,7 +275,7 @@ export const shouldUseLLM = (userId: string): boolean => {
  */
 export const formatSystemPrompt = (
   promptKey: keyof typeof SYSTEM_PROMPTS,
-  context?: Record<string, any>
+  context?: Record<string, unknown>
 ): string => {
   let prompt = SYSTEM_PROMPTS[promptKey];
 

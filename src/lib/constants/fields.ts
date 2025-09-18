@@ -190,7 +190,7 @@ export const isSensitiveField = (fieldId: string): boolean => {
  * @param value - The field value
  * @returns Sanitized value or placeholder for sensitive fields
  */
-export const sanitizeFieldValue = (fieldId: string, value: any): any => {
+export const sanitizeFieldValue = (fieldId: string, value: unknown): unknown => {
   if (isSensitiveField(fieldId)) {
     if (fieldId === FIELD_IDS.EMAIL) {
       // Keep domain for analytics but hide local part

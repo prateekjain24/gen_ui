@@ -51,7 +51,7 @@ export interface SessionState {
   completedSteps: string[];
 
   /** Collected form values keyed by field ID */
-  values: Record<string, any>;
+  values: Record<string, unknown>;
 
   /** Detected user persona based on behavior */
   persona?: UserPersona;
@@ -89,7 +89,7 @@ export interface SessionMetadata {
   variant?: 'control' | 'treatment';
 
   /** Custom properties for future extensibility */
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -100,7 +100,7 @@ export interface CreateSessionOptions {
   metadata?: SessionMetadata;
 
   /** Pre-populated values (e.g., from URL params) */
-  initialValues?: Record<string, any>;
+  initialValues?: Record<string, unknown>;
 }
 
 /**
@@ -114,7 +114,7 @@ export interface UpdateSessionOptions {
   addCompletedStep?: string;
 
   /** Merge new values with existing */
-  values?: Record<string, any>;
+  values?: Record<string, unknown>;
 
   /** Update detected persona */
   persona?: UserPersona;
@@ -131,7 +131,7 @@ export interface UpdateSessionOptions {
  * @param value - The value to check
  * @returns True if the value is a valid UserPersona
  */
-export const isUserPersona = (value: any): value is UserPersona => {
+export const isUserPersona = (value: unknown): value is UserPersona => {
   return value === 'explorer' || value === 'team';
 };
 
@@ -140,17 +140,17 @@ export const isUserPersona = (value: any): value is UserPersona => {
  * @param obj - The object to check
  * @returns True if the object is a valid SessionState
  */
-export const isSessionState = (obj: any): obj is SessionState => {
+export const isSessionState = (obj: unknown): obj is SessionState => {
   return (
     typeof obj === 'object' &&
     obj !== null &&
-    typeof obj.id === 'string' &&
-    obj.createdAt instanceof Date &&
-    obj.lastActivityAt instanceof Date &&
-    typeof obj.currentStep === 'string' &&
-    Array.isArray(obj.completedSteps) &&
-    typeof obj.values === 'object' &&
-    Array.isArray(obj.events)
+    typeof (obj as SessionState).id === 'string' &&
+    (obj as SessionState).createdAt instanceof Date &&
+    (obj as SessionState).lastActivityAt instanceof Date &&
+    typeof (obj as SessionState).currentStep === 'string' &&
+    Array.isArray((obj as SessionState).completedSteps) &&
+    typeof (obj as SessionState).values === 'object' &&
+    Array.isArray((obj as SessionState).events)
   );
 };
 

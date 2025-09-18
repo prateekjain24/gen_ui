@@ -88,9 +88,9 @@ export interface FieldChangeEvent extends BaseEvent {
   /** ID of the current step */
   stepId: string;
   /** Previous value (omitted for security) */
-  previousValue?: any;
+  previousValue?: unknown;
   /** New value (may be omitted for sensitive fields) */
-  newValue?: any;
+  newValue?: unknown;
   /** Number of times this field has been changed */
   changeCount: number;
 }
@@ -269,7 +269,7 @@ export interface ErrorEvent extends BaseEvent {
   /** Human-readable error message */
   errorMessage: string;
   /** Additional context about the error */
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 }
 
 /**
