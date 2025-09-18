@@ -49,10 +49,10 @@ Phase 2 adds AI-powered decision making, telemetry, A/B testing, and production 
 **Story Points:** 1
 **Dependencies:** [P2-003]
 **Acceptance Criteria:**
-- [ ] Session state serialization
-- [ ] Recent events included
-- [ ] Behavior signal detection (hesitation, corrections)
-- [ ] Engagement score calculation
+- [x] Session state serialization
+- [x] Recent events included
+- [x] Behavior signal detection (hesitation, corrections)
+- [x] Engagement score calculation
 **Technical Notes:**
 - Limit context to relevant information
 - Format for optimal LLM parsing

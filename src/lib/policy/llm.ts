@@ -11,6 +11,7 @@ import {
   retryWithExponentialBackoff,
   shouldRetryOnError,
 } from '@/lib/llm/client';
+import { buildLLMUserContext, formatLLMUserContext } from '@/lib/llm/context';
 import { recordLLMUsage } from '@/lib/llm/usage-tracker';
 import type { FormPlan } from '@/lib/types/form';
 import type { SessionState } from '@/lib/types/session';
@@ -26,37 +27,9 @@ const backoffSettings: BackoffSettings = {
   jitterRatio: LLM_CONFIG.retry.jitterRatio,
 };
 
-function sanitizeValues(values: Record<string, unknown>): Record<string, unknown> {
-  const entries = Object.entries(values).slice(0, 15);
-  return entries.reduce<Record<string, unknown>>((acc, [key, value]) => {
-    if (value instanceof Date) {
-      acc[key] = value.toISOString();
-    } else if (typeof value === 'object' && value !== null) {
-      if (Array.isArray(value)) {
-        acc[key] = value
-          .slice(0, 10)
-          .map(item => (item instanceof Date ? item.toISOString() : item));
-      } else {
-        acc[key] = value;
-      }
-    } else {
-      acc[key] = value;
-    }
-    return acc;
-  }, {});
-}
-
 function buildPrompt(session: SessionState): string {
-  const context = {
-    sessionId: session.id,
-    persona: session.persona ?? 'unknown',
-    currentStep: session.currentStep,
-    completedSteps: session.completedSteps,
-    values: sanitizeValues(session.values),
-    metadata: session.metadata,
-  };
-
-  const serialized = JSON.stringify(context, null, 2);
+  const context = buildLLMUserContext(session);
+  const serialized = formatLLMUserContext(context);
 
   return `You are orchestrating an adaptive onboarding form.
 
