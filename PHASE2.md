@@ -7,10 +7,10 @@ Phase 2 adds AI-powered decision making, telemetry, A/B testing, and production 
 **Story Points:** 1
 **Dependencies:** [P1-020]
 **Acceptance Criteria:**
-- [ ] OpenAI client initialized with API key
-- [ ] Error handling for API failures
-- [ ] Retry logic with exponential backoff
-- [ ] Token usage tracking implemented
+- [x] OpenAI client initialized with API key (`createOpenAI` provider cached in `LLMClient`)
+- [x] Error handling for API failures (maps API + timeout errors to typed `LLMServiceError` codes)
+- [x] Retry logic with exponential backoff (configurable attempts/jitter in `retryWithExponentialBackoff`)
+- [x] Token usage tracking implemented (in-memory aggregator in `usage-tracker`)
 **Technical Notes:**
 - Use AI SDK 5's OpenAI provider
 - Implement proper timeout handling

@@ -9,9 +9,12 @@
 /**
  * LLM model configuration
  */
+const FALLBACK_MODEL = 'gpt-5-mini';
+const configuredModel = process.env.OPENAI_MODEL?.trim() || FALLBACK_MODEL;
+
 export const LLM_CONFIG = {
   /** OpenAI model to use for form decisions */
-  model: 'gpt-4-turbo' as const,
+  model: configuredModel,
 
   /** Temperature for response generation (lower = more deterministic) */
   temperature: 0.3,
@@ -37,11 +40,15 @@ export const LLM_CONFIG = {
   /** Retry configuration */
   retry: {
     /** Maximum number of retry attempts */
-    maxAttempts: 2,
+    maxAttempts: 3,
     /** Initial delay between retries in ms */
-    initialDelay: 500,
+    initialDelay: 400,
     /** Maximum delay between retries in ms */
-    maxDelay: 2000,
+    maxDelay: 3200,
+    /** Backoff multiplier between attempts */
+    backoffMultiplier: 2,
+    /** Random jitter percentage applied to delays */
+    jitterRatio: 0.2,
   },
 } as const;
 
