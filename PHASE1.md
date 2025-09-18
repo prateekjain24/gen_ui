@@ -136,14 +136,15 @@ Phase 1 establishes the core foundation with deterministic rules-based flow, del
 **Risks:**
 - Complex branching may become hard to maintain
 
-### [P1-010] Rules Engine - Step Builders
+### [P1-010] Rules Engine - Step Builders ✅
 **Story Points:** 1
 **Dependencies:** [P1-009]
+**Status:** COMPLETE
 **Acceptance Criteria:**
-- [ ] createBasicsStep with proper field configuration
-- [ ] createWorkspaceStep with conditional fields
-- [ ] createPreferencesStep with checkbox groups
-- [ ] Field values preserved from session state
+- [x] createBasicsStep with proper field configuration
+- [x] createWorkspaceStep with conditional fields
+- [x] createPreferencesStep with checkbox groups
+- [x] Field values preserved from session state
 **Technical Notes:**
 - Reuse field configurations from constants
 - Apply persona-based logic (explorer vs team)
