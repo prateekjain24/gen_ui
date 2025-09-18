@@ -21,10 +21,10 @@ Phase 2 adds AI-powered decision making, telemetry, A/B testing, and production 
 **Story Points:** 1
 **Dependencies:** [P2-001]
 **Acceptance Criteria:**
-- [ ] propose_next_step tool schema defined
-- [ ] Parameter validation for all fields
-- [ ] Enum constraints for whitelisted values
-- [ ] JSON Schema properly formatted
+- [x] propose_next_step tool schema defined
+- [x] Parameter validation for all fields (reasoning, confidence, step config, fields, CTAs)
+- [x] Enum constraints for whitelisted values (step IDs, field IDs, field kinds, CTA actions)
+- [x] JSON Schema properly formatted with `additionalProperties: false`
 **Technical Notes:**
 - Follow OpenAI function calling format
 - Keep schema concise to save tokens
