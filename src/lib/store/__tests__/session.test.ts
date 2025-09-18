@@ -5,7 +5,7 @@
 import { sessionStore } from '../session';
 
 import { SESSION_CONFIG } from '@/lib/constants';
-import { UXEvent, FieldChangeEvent } from '@/lib/types/events';
+import { UXEvent, FieldChangeEvent, isFieldChangeEvent } from '@/lib/types/events';
 
 
 // Mock timers for testing
@@ -164,7 +164,11 @@ describe('SessionStore', () => {
       expect(events).toHaveLength(SESSION_CONFIG.MAX_EVENTS_PER_SESSION);
 
       // First events should have been removed (circular buffer)
-      expect(events[0].fieldId).toBe('field_10');
+      const firstEvent = events[0];
+      expect(isFieldChangeEvent(firstEvent)).toBe(true);
+      if (isFieldChangeEvent(firstEvent)) {
+        expect(firstEvent.fieldId).toBe('field_10');
+      }
     });
 
     test('should add multiple events', () => {
@@ -374,6 +378,7 @@ describe('SessionStore', () => {
         timestamp: new Date().toISOString(),
         sessionId: session1.id,
         fieldId: 'name',
+        stepId: 'basics',
       });
 
       const stats = sessionStore.getStats();
