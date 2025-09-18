@@ -138,6 +138,11 @@ function detectPersona(session: SessionState): UserPersona {
     return session.persona;
   }
 
+  const inferred = detectPersonaFromSession(session);
+  if (inferred) {
+    return inferred;
+  }
+
   const primaryUse = session.values[FIELD_IDS.PRIMARY_USE];
   if (typeof primaryUse === 'string') {
     if (['team', 'client', 'enterprise'].includes(primaryUse)) {
@@ -148,8 +153,7 @@ function detectPersona(session: SessionState): UserPersona {
     }
   }
 
-  const inferred = detectPersonaFromSession(session);
-  return inferred ?? 'explorer';
+  return 'explorer';
 }
 
 /**
@@ -352,99 +356,53 @@ function createPreferencesStep(session: SessionState, _persona: UserPersona): Fo
 function createReviewStep(session: SessionState): FormPlan {
   const summary: Array<{ label: string; value: string }> = [];
 
-  // Add basic information
-  if (session.values[FIELD_IDS.FULL_NAME]) {
-    summary.push({
-      label: 'Name',
-      value: session.values[FIELD_IDS.FULL_NAME] as string,
-    });
-  }
-
-  if (session.values[FIELD_IDS.EMAIL]) {
-    summary.push({
-      label: 'Email',
-      value: session.values[FIELD_IDS.EMAIL] as string,
-    });
-  }
-
-  if (session.values[FIELD_IDS.ROLE]) {
-    const role = ROLE_OPTIONS.find(
-      opt => opt.value === session.values[FIELD_IDS.ROLE]
-    );
-    summary.push({
-      label: 'Role',
-      value: role?.label || session.values[FIELD_IDS.ROLE] as string,
-    });
-  }
-
-  if (session.values[FIELD_IDS.PRIMARY_USE]) {
-    const useCase = USE_CASE_OPTIONS.find(
-      opt => opt.value === session.values[FIELD_IDS.PRIMARY_USE]
-    );
-    summary.push({
-      label: 'Primary Use',
-      value: useCase?.label || session.values[FIELD_IDS.PRIMARY_USE] as string,
-    });
-  }
-
-  // Add workspace information
-  if (session.values[FIELD_IDS.WORKSPACE_NAME]) {
-    summary.push({
-      label: 'Workspace',
-      value: session.values[FIELD_IDS.WORKSPACE_NAME] as string,
-    });
-  }
-
-  if (session.values[FIELD_IDS.COMPANY]) {
-    summary.push({
-      label: 'Company',
-      value: session.values[FIELD_IDS.COMPANY] as string,
-    });
-  }
-
-  if (session.values[FIELD_IDS.TEAM_SIZE]) {
-    const teamSize = TEAM_SIZE_OPTIONS.find(
-      opt => opt.value === session.values[FIELD_IDS.TEAM_SIZE]
-    );
-    summary.push({
-      label: 'Team Size',
-      value: teamSize?.label || session.values[FIELD_IDS.TEAM_SIZE] as string,
-    });
-  }
-
-  if (session.values[FIELD_IDS.PROJECT_TYPE]) {
-    const projectType = PROJECT_TYPE_OPTIONS.find(
-      opt => opt.value === session.values[FIELD_IDS.PROJECT_TYPE]
-    );
-    summary.push({
-      label: 'Project Type',
-      value: projectType?.label || session.values[FIELD_IDS.PROJECT_TYPE] as string,
-    });
-  }
-
-  // Add preferences
-  if (session.values[FIELD_IDS.THEME]) {
-    const theme = THEME_OPTIONS.find(
-      opt => opt.value === session.values[FIELD_IDS.THEME]
-    );
-    summary.push({
-      label: 'Theme',
-      value: theme?.label || session.values[FIELD_IDS.THEME] as string,
-    });
-  }
-
-  if (session.values[FIELD_IDS.FEATURES] && Array.isArray(session.values[FIELD_IDS.FEATURES])) {
-    const features = session.values[FIELD_IDS.FEATURES] as string[];
-    if (features.length > 0) {
-      const featureLabels = features
-        .map(f => FEATURE_OPTIONS.find(opt => opt.value === f)?.label || f)
-        .join(', ');
-      summary.push({
-        label: 'Features',
-        value: featureLabels,
-      });
+  const addItem = (label: string, value?: string | string[]) => {
+    if (!value || (Array.isArray(value) && value.length === 0)) {
+      return;
     }
+
+    const normalizedValue = Array.isArray(value) ? value.join(', ') : value;
+    summary.push({ label, value: normalizedValue });
+  };
+
+  const getOptionLabel = (
+    options: ReadonlyArray<{ value: string; label: string }>,
+    value?: unknown
+  ) => {
+    if (typeof value !== 'string') return undefined;
+    return options.find(opt => opt.value === value)?.label ?? value;
+  };
+
+  // Basics
+  addItem('Name', session.values[FIELD_IDS.FULL_NAME] as string | undefined);
+  addItem('Email', session.values[FIELD_IDS.EMAIL] as string | undefined);
+  addItem('Role', getOptionLabel(ROLE_OPTIONS, session.values[FIELD_IDS.ROLE]));
+  addItem('Primary Use', getOptionLabel(USE_CASE_OPTIONS, session.values[FIELD_IDS.PRIMARY_USE]));
+
+  // Workspace
+  addItem('Workspace', session.values[FIELD_IDS.WORKSPACE_NAME] as string | undefined);
+  addItem('Company', session.values[FIELD_IDS.COMPANY] as string | undefined);
+  addItem('Team Size', getOptionLabel(TEAM_SIZE_OPTIONS, session.values[FIELD_IDS.TEAM_SIZE]));
+  addItem('Project Type', getOptionLabel(PROJECT_TYPE_OPTIONS, session.values[FIELD_IDS.PROJECT_TYPE]));
+
+  // Preferences
+  const featureValues = session.values[FIELD_IDS.FEATURES];
+  if (Array.isArray(featureValues) && featureValues.length) {
+    const labels = featureValues
+      .map(value => getOptionLabel(FEATURE_OPTIONS, value))
+      .filter(Boolean) as string[];
+    addItem('Features', labels);
   }
+
+  const notificationValues = session.values[FIELD_IDS.NOTIFICATIONS];
+  if (Array.isArray(notificationValues) && notificationValues.length) {
+    const labels = notificationValues
+      .map(value => getOptionLabel(NOTIFICATION_OPTIONS, value))
+      .filter(Boolean) as string[];
+    addItem('Notifications', labels);
+  }
+
+  addItem('Theme', getOptionLabel(THEME_OPTIONS, session.values[FIELD_IDS.THEME]));
 
   return {
     kind: 'review',
@@ -458,8 +416,8 @@ function createReviewStep(session: SessionState): FormPlan {
  */
 function createSuccessStep(session: SessionState): FormPlan {
   const persona = session.persona ?? detectPersona(session);
-  const name = session.values[FIELD_IDS.FULL_NAME] as string || 'there';
-  const firstName = name.split(' ')[0];
+  const name = (session.values[FIELD_IDS.FULL_NAME] as string | undefined)?.trim();
+  const firstName = name ? name.split(/\s+/)[0] : 'there';
 
   const message = persona === 'team'
     ? `Welcome aboard, ${firstName}! Your team workspace is ready.`
