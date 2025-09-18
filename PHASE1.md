@@ -121,14 +121,15 @@ Phase 1 establishes the core foundation with deterministic rules-based flow, del
 **Risks:**
 - Timer may impact performance if too frequent
 
-### [P1-009] Rules Engine - Basic Step Flow
+### [P1-009] Rules Engine - Basic Step Flow ✅
 **Story Points:** 1
 **Dependencies:** [P1-003, P1-005]
+**Status:** COMPLETE
 **Acceptance Criteria:**
-- [ ] getNextStep main decision function implemented
-- [ ] Initial state handling (show basics step)
-- [ ] Step progression logic working
-- [ ] Null return for unknown states
+- [x] getNextStep main decision function implemented
+- [x] Initial state handling (show basics step)
+- [x] Step progression logic working
+- [x] Null return for unknown states
 **Technical Notes:**
 - Use strategy pattern for step decisions
 - Keep logic deterministic and testable
@@ -163,14 +164,15 @@ Phase 1 establishes the core foundation with deterministic rules-based flow, del
 **Risks:**
 - Summary generation may miss edge cases
 
-### [P1-012] Basic API Route - Plan Endpoint
+### [P1-012] Basic API Route - Plan Endpoint ✅
 **Story Points:** 1
 **Dependencies:** [P1-009, P1-006]
+**Status:** COMPLETE
 **Acceptance Criteria:**
-- [ ] POST /api/plan endpoint created
-- [ ] Request validation with Zod
-- [ ] Session creation/retrieval working
-- [ ] Rules engine integration complete
+- [x] POST /api/plan endpoint created
+- [x] Request validation implemented
+- [x] Session creation/retrieval working
+- [x] Rules engine integration complete
 **Technical Notes:**
 - Use Next.js 15.4 route handlers
 - Return decision source for debugging
