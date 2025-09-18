@@ -16,6 +16,10 @@ jest.mock('@/lib/policy/rules', () => ({
   getNextStepPlan: jest.fn(),
 }));
 
+jest.mock('@/lib/policy/llm', () => ({
+  generatePlanWithLLM: jest.fn(),
+}));
+
 const { sessionStore } = jest.requireMock('@/lib/store/session') as {
   sessionStore: {
     getSession: jest.Mock;
@@ -24,6 +28,10 @@ const { sessionStore } = jest.requireMock('@/lib/store/session') as {
 
 const { getNextStepPlan } = jest.requireMock('@/lib/policy/rules') as {
   getNextStepPlan: jest.Mock;
+};
+
+const { generatePlanWithLLM } = jest.requireMock('@/lib/policy/llm') as {
+  generatePlanWithLLM: jest.Mock;
 };
 
 const createMockRequest = (body: unknown): NextRequest => {
@@ -49,6 +57,7 @@ const createSession = (overrides: Partial<SessionState> = {}): SessionState => {
 describe('POST /api/plan', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    generatePlanWithLLM.mockReset();
   });
 
   it('returns 400 when sessionId is missing', async () => {
@@ -110,6 +119,67 @@ describe('POST /api/plan', () => {
 
     expect(sessionStore.getSession).toHaveBeenCalledWith('session-123');
     expect(getNextStepPlan).toHaveBeenCalledWith(session);
+  });
+
+  it('returns LLM plan when strategy is llm and generation succeeds', async () => {
+    const session = createSession();
+    sessionStore.getSession.mockReturnValue(session);
+
+    const rulesPlan: FormPlan = {
+      kind: 'render_step',
+      step: {
+        stepId: 'basics',
+        title: 'Basics',
+        fields: [],
+        primaryCta: { label: 'Continue', action: 'submit_step' },
+      },
+      stepper: [],
+    };
+
+    const llmPlan: FormPlan = {
+      kind: 'render_step',
+      step: {
+        stepId: 'workspace',
+        title: 'Workspace',
+        fields: [],
+        primaryCta: { label: 'Next', action: 'submit_step' },
+      },
+      stepper: [],
+    };
+
+    getNextStepPlan.mockReturnValue(rulesPlan);
+    generatePlanWithLLM.mockResolvedValue(llmPlan);
+
+    const req = createMockRequest({ sessionId: 'session-123', strategy: 'llm' });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ plan: llmPlan, source: 'llm' });
+  });
+
+  it('falls back to rules when strategy is llm but LLM plan is unavailable', async () => {
+    const session = createSession();
+    sessionStore.getSession.mockReturnValue(session);
+
+    const rulesPlan: FormPlan = {
+      kind: 'render_step',
+      step: {
+        stepId: 'basics',
+        title: 'Basics',
+        fields: [],
+        primaryCta: { label: 'Continue', action: 'submit_step' },
+      },
+      stepper: [],
+    };
+
+    getNextStepPlan.mockReturnValue(rulesPlan);
+    generatePlanWithLLM.mockResolvedValue(null);
+
+    const req = createMockRequest({ sessionId: 'session-123', strategy: 'llm' });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ plan: rulesPlan, source: 'fallback' });
   });
 
   it('trims sessionId before lookup', async () => {

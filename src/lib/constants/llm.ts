@@ -228,9 +228,17 @@ export const LLM_TELEMETRY_EVENTS = [
 /**
  * Feature flags for LLM capabilities (for gradual rollout)
  */
+const envEnableAiOrchestration = process.env.ENABLE_LLM_ORCHESTRATION === 'true';
+const envRollout = Number.parseInt(process.env.LLM_ROLLOUT_PERCENTAGE ?? '', 10);
+const normalizedRollout = Number.isFinite(envRollout)
+  ? Math.min(Math.max(envRollout, 0), 100)
+  : envEnableAiOrchestration
+    ? 100
+    : 0;
+
 export const LLM_FEATURES = {
   /** Enable LLM-powered form orchestration */
-  ENABLE_AI_ORCHESTRATION: false,
+  ENABLE_AI_ORCHESTRATION: envEnableAiOrchestration,
 
   /** Enable persona detection */
   ENABLE_PERSONA_DETECTION: false,
@@ -245,7 +253,7 @@ export const LLM_FEATURES = {
   ENABLE_ERROR_RECOVERY: false,
 
   /** Percentage of users to include in AI features (0-100) */
-  ROLLOUT_PERCENTAGE: 0,
+  ROLLOUT_PERCENTAGE: normalizedRollout,
 } as const;
 
 /**

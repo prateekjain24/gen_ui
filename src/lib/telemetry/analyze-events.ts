@@ -1,5 +1,4 @@
-import type { SessionState } from '@/lib/types/session';
-import type { UXEvent } from '@/lib/types/events';
+import type { FieldBlurEvent, FieldChangeEvent, UXEvent } from '@/lib/types/events';
 
 export const EVENT_TYPES = [
   'field_focus',
@@ -27,6 +26,9 @@ const isStepAwareEvent = (event: UXEvent): event is StepAwareEvent =>
   event.type === 'step_back' ||
   event.type === 'flow_complete' ||
   event.type === 'flow_abandon';
+
+const isFieldBlurEvent = (event: UXEvent): event is FieldBlurEvent => event.type === 'field_blur';
+const isFieldChangeEvent = (event: UXEvent): event is FieldChangeEvent => event.type === 'field_change';
 
 export interface HesitationSignal {
   fieldId: string;
@@ -82,16 +84,16 @@ function collectTypeCounts(events: UXEvent[]): Record<UXEvent['type'], number> {
 
 function collectHesitations(events: UXEvent[]): HesitationSignal[] {
   return events
-    .filter(event => event.type === 'field_blur' && typeof event.timeSpentMs === 'number')
-    .filter(event => event.timeSpentMs! >= HESITATION_THRESHOLD_MS)
-    .map(event => ({ fieldId: event.fieldId, timeSpentMs: event.timeSpentMs! }));
+    .filter(isFieldBlurEvent)
+    .filter(event => typeof event.timeSpentMs === 'number' && event.timeSpentMs >= HESITATION_THRESHOLD_MS)
+    .map(event => ({ fieldId: event.fieldId, timeSpentMs: event.timeSpentMs ?? 0 }));
 }
 
 function collectCorrections(events: UXEvent[]): CorrectionSignal[] {
   const totals = new Map<string, number>();
 
   for (const event of events) {
-    if (event.type !== 'field_change' || typeof event.changeCount !== 'number') continue;
+    if (!isFieldChangeEvent(event)) continue;
     if (event.changeCount < CORRECTION_THRESHOLD) continue;
     const current = totals.get(event.fieldId) ?? 0;
     totals.set(event.fieldId, Math.max(current, event.changeCount));
@@ -225,7 +227,7 @@ export function summarizeTimeOnStep(events: UXEvent[]): TimeOnStepInsight[] {
   const durationByStep = new Map<string, { total: number; visits: number }>();
 
   for (const event of events) {
-    if (event.type !== 'field_blur' || typeof event.stepId !== 'string') continue;
+    if (!isFieldBlurEvent(event) || typeof event.stepId !== 'string') continue;
     if (typeof event.timeSpentMs !== 'number') continue;
 
     const record = durationByStep.get(event.stepId) ?? { total: 0, visits: 0 };

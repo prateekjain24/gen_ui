@@ -1,6 +1,8 @@
 import type { FormPlan } from '@/lib/types/form';
 import type { SessionState } from '@/lib/types/session';
 
+type PlanStrategy = 'auto' | 'llm' | 'rules';
+
 interface PlanResponse {
   plan: FormPlan;
   source: string;
@@ -59,13 +61,16 @@ export async function createSession(): Promise<CreateSessionResponse> {
   return handleResponse<CreateSessionResponse>(response);
 }
 
-export async function fetchPlan(sessionId: string): Promise<PlanResponse> {
+export async function fetchPlan(
+  sessionId: string,
+  options: { strategy?: PlanStrategy } = {}
+): Promise<PlanResponse> {
   const response = await fetch('/api/plan', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ sessionId }),
+    body: JSON.stringify({ sessionId, strategy: options.strategy }),
   });
 
   return handleResponse<PlanResponse>(response);

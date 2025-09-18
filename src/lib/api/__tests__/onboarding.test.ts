@@ -63,6 +63,23 @@ describe('lib/api/onboarding', () => {
     );
   });
 
+  it('allows passing a strategy when fetching plan', async () => {
+    const mockPlan = { plan: { kind: 'success', message: 'done' }, source: 'rules' };
+
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify(mockPlan), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await fetchPlan('session-123', { strategy: 'llm' });
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/plan',
+      expect.objectContaining({ body: JSON.stringify({ sessionId: 'session-123', strategy: 'llm' }) })
+    );
+  });
+
   it('updates session data', async () => {
     const mockSession = { session: { id: 'session-123' } };
 

@@ -1,8 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { DECISION_SOURCES, shouldUseLLM } from '@/lib/constants/llm';
+import { generatePlanWithLLM } from '@/lib/policy/llm';
 import { getNextStepPlan } from '@/lib/policy/rules';
 import { sessionStore } from '@/lib/store/session';
 import { createDebugger } from '@/lib/utils/debug';
+
+type DecisionSource = (typeof DECISION_SOURCES)[keyof typeof DECISION_SOURCES];
+
+type PlanStrategy = 'auto' | 'rules' | 'llm';
+
+function normalizeStrategy(value: unknown): PlanStrategy {
+  if (typeof value !== 'string') {
+    return 'auto';
+  }
+
+  const lowered = value.trim().toLowerCase();
+  if (lowered === 'rules') return 'rules';
+  if (lowered === 'llm') return 'llm';
+  return 'auto';
+}
 
 const debug = createDebugger('PlanAPI');
 
@@ -15,6 +32,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
     const rawSessionId = typeof body?.sessionId === 'string' ? body.sessionId.trim() : '';
+    const strategy = normalizeStrategy(body?.strategy);
 
     if (!rawSessionId) {
       return NextResponse.json(
@@ -38,10 +56,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Generate plan using rules engine
-    const plan = getNextStepPlan(session);
+    const rulesPlan = getNextStepPlan(session);
 
-    if (!plan) {
+    if (!rulesPlan) {
       return NextResponse.json(
         {
           error: 'Unable to determine next step',
@@ -51,11 +68,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    debug(`Generated plan for session ${rawSessionId}: ${plan.kind}`);
+    let finalPlan = rulesPlan;
+    let source: DecisionSource = DECISION_SOURCES.RULES;
+
+    const forcedLLM = strategy === 'llm';
+    const allowLLM = forcedLLM || (strategy === 'auto' && shouldUseLLM(session.id));
+
+    if (allowLLM) {
+      const llmPlan = await generatePlanWithLLM(session);
+      if (llmPlan) {
+        finalPlan = llmPlan;
+        source = DECISION_SOURCES.LLM;
+      } else if (forcedLLM) {
+        source = DECISION_SOURCES.FALLBACK;
+      }
+    } else if (forcedLLM) {
+      source = DECISION_SOURCES.FALLBACK;
+    }
+
+    debug(`Generated plan for session ${rawSessionId}: ${finalPlan.kind} (source=${source})`);
 
     return NextResponse.json({
-      plan,
-      source: 'rules', // Will be 'rules' | 'llm' | 'fallback' in Phase 2
+      plan: finalPlan,
+      source,
     });
   } catch (error) {
     console.error('Error generating plan:', error);

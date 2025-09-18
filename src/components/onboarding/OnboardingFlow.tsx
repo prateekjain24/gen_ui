@@ -27,6 +27,9 @@ const isFilled = (value: unknown): boolean => {
 };
 
 const SESSION_STORAGE_KEY = 'gen_ui_session_id';
+const LLM_STRATEGY_STORAGE_KEY = 'gen_ui_llm_strategy';
+const DEFAULT_LLM_STRATEGY =
+  process.env.NEXT_PUBLIC_LLM_STRATEGY === 'llm' ? 'llm' : 'rules';
 
 function extractCompletedSteps(stepper: StepperItem[]): string[] {
   return stepper.filter(step => step.completed).map(step => step.id);
@@ -60,6 +63,7 @@ export function OnboardingFlow() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [planSource, setPlanSource] = React.useState<string>('rules');
+  const [llmStrategy, setLlmStrategy] = React.useState<'llm' | 'rules'>(DEFAULT_LLM_STRATEGY);
   const [lastPlanFetchedAt, setLastPlanFetchedAt] = React.useState<number | null>(null);
 
   const requestCounter = React.useRef(0);
@@ -92,19 +96,36 @@ export function OnboardingFlow() {
     return newSessionId;
   }, [sessionId]);
 
+  React.useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const stored = window.sessionStorage.getItem(LLM_STRATEGY_STORAGE_KEY) as 'llm' | 'rules' | null;
+    if (stored) {
+      setLlmStrategy(stored);
+    }
+  }, []);
+
   // Fetches the latest plan while ensuring only the newest request updates local state.
   const refreshPlan = React.useCallback(
-    async (currentSessionId: string) => {
+    async (currentSessionId: string, overrideStrategy?: 'auto' | 'llm' | 'rules') => {
       const requestId = ++requestCounter.current;
       setIsLoading(true);
       setError(null);
 
       try {
-        const { plan: nextPlan, source } = await fetchPlan(currentSessionId);
+        const strategy = overrideStrategy ?? (llmStrategy === 'llm' ? 'llm' : 'rules');
+        const { plan: nextPlan, source } = await fetchPlan(currentSessionId, { strategy });
         if (requestCounter.current === requestId) {
           setPlan(nextPlan);
           setPlanSource(source);
           setLastPlanFetchedAt(Date.now());
+          if (source === 'fallback') {
+            setError('AI temporarily unavailable – continuing with rules-based plan.');
+          } else {
+            setError(null);
+          }
         }
       } catch (err) {
         if (requestCounter.current === requestId) {
@@ -117,7 +138,7 @@ export function OnboardingFlow() {
         }
       }
     },
-    []
+    [llmStrategy]
   );
 
   const initialise = React.useCallback(async () => {
@@ -136,6 +157,20 @@ export function OnboardingFlow() {
   }, [initialise]);
 
   const shouldShowDebugPanel = ENV.isDevelopment || ENV.isDebug;
+
+  const handleStrategyChange = React.useCallback(
+    (next: 'llm' | 'rules') => {
+      setLlmStrategy(next);
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem(LLM_STRATEGY_STORAGE_KEY, next);
+      }
+
+      if (sessionId) {
+        void refreshPlan(sessionId, next);
+      }
+    },
+    [refreshPlan, sessionId]
+  );
 
   React.useEffect(() => {
     if (!sessionId) {
@@ -483,6 +518,8 @@ export function OnboardingFlow() {
           isSubmitting={isSubmitting}
           error={error}
           lastFetchedAt={lastPlanFetchedAt}
+          llmStrategy={llmStrategy}
+          onStrategyChange={handleStrategyChange}
         />
       ) : null}
     </div>

@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { FormPlan, StepperItem } from '@/lib/types/form';
 
@@ -13,6 +14,8 @@ interface DebugPanelProps {
   readonly isSubmitting: boolean;
   readonly error: string | null;
   readonly lastFetchedAt: number | null;
+  readonly llmStrategy: 'llm' | 'rules';
+  readonly onStrategyChange?: (strategy: 'llm' | 'rules') => void;
 }
 
 function formatTimestamp(timestamp: number | null): string {
@@ -107,9 +110,18 @@ export function DebugPanel({
   isSubmitting,
   error,
   lastFetchedAt,
+  llmStrategy,
+  onStrategyChange,
 }: DebugPanelProps) {
   const planSummary = React.useMemo(() => getPlanSummary(plan), [plan]);
   const prettyPlan = React.useMemo(() => (plan ? JSON.stringify(plan, null, 2) : 'No plan loaded yet.'), [plan]);
+
+  const handleToggle = React.useCallback(() => {
+    if (!onStrategyChange) {
+      return;
+    }
+    onStrategyChange(llmStrategy === 'llm' ? 'rules' : 'llm');
+  }, [llmStrategy, onStrategyChange]);
 
   return (
     <Card className="border-dashed border-primary/40 bg-muted/40">
@@ -126,6 +138,23 @@ export function DebugPanel({
           <DebugRow label="Last fetch" value={formatTimestamp(lastFetchedAt)} />
           <DebugRow label="Status" value={isLoading ? 'Fetching plan…' : isSubmitting ? 'Submitting data…' : 'Idle'} />
           <DebugRow label="Error" value={error ?? 'None'} />
+        </div>
+        <div className="flex flex-col gap-2 rounded-md border border-border/60 bg-background/70 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm">
+            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">LLM Strategy</span>
+            <div className="font-medium text-foreground">
+              {llmStrategy === 'llm' ? 'LLM (with fallback)' : 'Rules only'}
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleToggle}
+            disabled={!onStrategyChange}
+          >
+            Switch to {llmStrategy === 'llm' ? 'rules' : 'LLM'}
+          </Button>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           {planSummary.map(item => (
