@@ -77,41 +77,44 @@ Phase 1 establishes the core foundation with deterministic rules-based flow, del
 **Risks:**
 - Constants may need updates as requirements clarify
 
-### [P1-006] Session Store - Core Operations
+### [P1-006] Session Store - Core Operations ✅
 **Story Points:** 1
 **Dependencies:** [P1-004]
+**Status:** COMPLETE
 **Acceptance Criteria:**
-- [ ] Create, get, update session methods implemented
-- [ ] In-memory Map storage working
-- [ ] Session ID generation with UUID
-- [ ] Type safety maintained throughout
+- [x] Create, get, update session methods implemented
+- [x] In-memory Map storage working
+- [x] Session ID generation with UUID
+- [x] Type safety maintained throughout
 **Technical Notes:**
 - Use singleton pattern for store
 - Consider WeakMap for better memory management
 **Risks:**
 - Memory leaks if cleanup not implemented properly
 
-### [P1-007] Session Store - Event Management
+### [P1-007] Session Store - Event Management ✅
 **Story Points:** 1
 **Dependencies:** [P1-006]
+**Status:** COMPLETE
 **Acceptance Criteria:**
-- [ ] addEvent method with queue management
-- [ ] Event limit of 50 per session enforced
-- [ ] Timestamp tracking for all events
-- [ ] Event retrieval methods implemented
+- [x] addEvent method with queue management
+- [x] Event limit of 50 per session enforced
+- [x] Timestamp tracking for all events
+- [x] Event retrieval methods implemented
 **Technical Notes:**
 - Use circular buffer pattern for event limiting
 **Risks:**
 - Event loss if buffer size too small
 
-### [P1-008] Session Store - Cleanup & Persistence
+### [P1-008] Session Store - Cleanup & Persistence ✅
 **Story Points:** 1
 **Dependencies:** [P1-006]
+**Status:** COMPLETE
 **Acceptance Criteria:**
-- [ ] Automatic cleanup of stale sessions (>1 hour)
-- [ ] Cleanup interval timer implemented
-- [ ] lastActivityAt tracking working
-- [ ] Memory usage stays bounded
+- [x] Automatic cleanup of stale sessions (>1 hour)
+- [x] Cleanup interval timer implemented
+- [x] lastActivityAt tracking working
+- [x] Memory usage stays bounded
 **Technical Notes:**
 - Use setInterval only on server side
 - Clear intervals on process exit
