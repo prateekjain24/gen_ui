@@ -42,9 +42,8 @@ describe('SessionStore', () => {
       };
 
       const session = sessionStore.createSession({
-        currentStep: 'basics',
-        values: { name: 'Test User' },
         metadata,
+        initialValues: { name: 'Test User' },
       });
 
       expect(session.currentStep).toBe('basics');
@@ -67,14 +66,19 @@ describe('SessionStore', () => {
     test('should update session fields', () => {
       const session = sessionStore.createSession();
 
-      const updated = sessionStore.updateSession(session.id, {
+      const firstUpdate = sessionStore.updateSession(session.id, {
         currentStep: 'preferences',
-        completedSteps: ['basics', 'workspace'],
+        addCompletedStep: 'basics',
         values: { role: 'developer', team: 'engineering' },
         persona: 'team',
       });
 
-      expect(updated).toBeDefined();
+      sessionStore.updateSession(session.id, {
+        addCompletedStep: 'workspace',
+      });
+
+      expect(firstUpdate).toBeDefined();
+      const updated = sessionStore.getSession(session.id);
       expect(updated?.currentStep).toBe('preferences');
       expect(updated?.completedSteps).toEqual(['basics', 'workspace']);
       expect(updated?.values).toEqual({ role: 'developer', team: 'engineering' });
@@ -83,7 +87,7 @@ describe('SessionStore', () => {
 
     test('should merge values on update', () => {
       const session = sessionStore.createSession({
-        values: { name: 'Test' },
+        initialValues: { name: 'Test' },
       });
 
       sessionStore.updateSession(session.id, {
@@ -124,8 +128,10 @@ describe('SessionStore', () => {
         timestamp: new Date().toISOString(),
         sessionId: session.id,
         fieldId: 'name',
-        value: 'Test User',
+        stepId: 'basics',
+        newValue: 'Test User',
         previousValue: '',
+        changeCount: 1,
       };
 
       const added = sessionStore.addEvent(session.id, event);
@@ -146,8 +152,10 @@ describe('SessionStore', () => {
           timestamp: new Date().toISOString(),
           sessionId: session.id,
           fieldId: `field_${i}`,
-          value: `value_${i}`,
+          stepId: 'workspace',
+          newValue: `value_${i}`,
           previousValue: '',
+          changeCount: i + 1,
         };
         sessionStore.addEvent(session.id, event);
       }
@@ -167,13 +175,16 @@ describe('SessionStore', () => {
           timestamp: new Date().toISOString(),
           sessionId: session.id,
           fieldId: 'name',
+          stepId: 'basics',
         },
         {
           type: 'field_blur',
           timestamp: new Date().toISOString(),
           sessionId: session.id,
           fieldId: 'name',
+          stepId: 'basics',
           timeSpentMs: 5000,
+          hadValue: true,
         },
       ];
 
@@ -192,6 +203,7 @@ describe('SessionStore', () => {
         timestamp: new Date().toISOString(),
         sessionId: session.id,
         fieldId: 'name',
+        stepId: 'basics',
       });
 
       sessionStore.addEvent(session.id, {
@@ -199,8 +211,10 @@ describe('SessionStore', () => {
         timestamp: new Date().toISOString(),
         sessionId: session.id,
         fieldId: 'name',
-        value: 'Test',
+        stepId: 'basics',
+        newValue: 'Test',
         previousValue: '',
+        changeCount: 1,
       });
 
       sessionStore.addEvent(session.id, {
@@ -208,6 +222,7 @@ describe('SessionStore', () => {
         timestamp: new Date().toISOString(),
         sessionId: session.id,
         fieldId: 'role',
+        stepId: 'basics',
       });
 
       const focusEvents = sessionStore.getEventsByType(session.id, 'field_focus');
@@ -223,8 +238,10 @@ describe('SessionStore', () => {
         timestamp: '2024-01-01T10:00:00.000Z',
         sessionId: session.id,
         stepId: 'basics',
-        values: { name: 'Test' },
+        fieldCount: 3,
+        filledFieldCount: 3,
         timeSpentMs: 1000,
+        isValid: true,
       });
 
       sessionStore.addEvent(session.id, {
@@ -232,8 +249,10 @@ describe('SessionStore', () => {
         timestamp: '2024-01-01T10:01:00.000Z',
         sessionId: session.id,
         stepId: 'workspace',
-        values: { role: 'developer' },
+        fieldCount: 2,
+        filledFieldCount: 2,
         timeSpentMs: 2000,
+        isValid: true,
       });
 
       const latest = sessionStore.getLatestEventOfType(session.id, 'step_submit');
@@ -248,8 +267,10 @@ describe('SessionStore', () => {
         timestamp: new Date().toISOString(),
         sessionId: session.id,
         fieldId: 'name',
-        value: 'Test',
+        stepId: 'basics',
+        newValue: 'Test',
         previousValue: '',
+        changeCount: 1,
       };
 
       sessionStore.updateSession(session.id, {
@@ -285,15 +306,9 @@ describe('SessionStore', () => {
       const session2 = sessionStore.createSession();
       const session3 = sessionStore.createSession();
 
-      // Make session1 stale
+      // Make session1 stale by retroactively adjusting its last activity
       const staleTime = (SESSION_CONFIG.MAX_IDLE_MINUTES + 1) * 60 * 1000;
-      jest.advanceTimersByTime(staleTime);
-
-      // Keep session2 active
-      sessionStore.getSession(session2.id);
-
-      // Keep session3 active
-      sessionStore.getSession(session3.id);
+      session1.lastActivityAt = new Date(Date.now() - staleTime);
 
       // Trigger cleanup
       jest.advanceTimersByTime(SESSION_CONFIG.CLEANUP_INTERVAL_MINUTES * 60 * 1000);
@@ -384,15 +399,17 @@ describe('SessionStore', () => {
 
     test('should track cleanup statistics', () => {
       // Create stale session
-      sessionStore.createSession();
+      const session = sessionStore.createSession();
 
       const initialStats = sessionStore.getStats();
 
-      // Make session stale
-      jest.advanceTimersByTime((SESSION_CONFIG.MAX_IDLE_MINUTES + 1) * 60 * 1000);
+      // Make session stale by manual adjustment
+      const staleTime = (SESSION_CONFIG.MAX_IDLE_MINUTES + 1) * 60 * 1000;
+      session.lastActivityAt = new Date(Date.now() - staleTime);
 
-      // Trigger cleanup
-      jest.advanceTimersByTime(SESSION_CONFIG.CLEANUP_INTERVAL_MINUTES * 60 * 1000);
+      // Trigger cleanup interval manually to avoid timer coupling in tests
+      const runCleanup = (sessionStore as unknown as { cleanupStaleSessions: () => void }).cleanupStaleSessions;
+      runCleanup.call(sessionStore);
 
       const stats = sessionStore.getStats();
       expect(stats.sessionsCleanedUp).toBeGreaterThan(initialStats.sessionsCleanedUp);
@@ -412,6 +429,7 @@ describe('SessionStore', () => {
         timestamp: new Date().toISOString(),
         sessionId: nonExistentId,
         fieldId: 'test',
+        stepId: 'basics',
       })).toBe(false);
       expect(sessionStore.getEvents(nonExistentId)).toEqual([]);
     });

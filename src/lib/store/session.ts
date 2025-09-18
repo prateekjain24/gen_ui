@@ -129,6 +129,7 @@ class SessionStore {
     // Check if session has expired
     if (isSessionExpired(session, SESSION_CONFIG.MAX_IDLE_MINUTES)) {
       this.deleteSession(id);
+      this.stats.sessionsCleanedUp += 1;
       return null;
     }
 
@@ -252,7 +253,12 @@ class SessionStore {
    */
   public getEvents(sessionId: string): UXEvent[] {
     const session = this.getSession(sessionId);
-    return session?.events || [];
+    if (!session) {
+      return [];
+    }
+
+    // Return a shallow copy to protect the internal queue from mutation.
+    return [...session.events];
   }
 
   /**
@@ -376,7 +382,13 @@ class SessionStore {
    * @returns Array of all active sessions
    */
   public getAllSessions(): SessionState[] {
-    return Array.from(this.sessions.values());
+    return Array.from(this.sessions.values()).map(session => ({
+      ...session,
+      completedSteps: [...session.completedSteps],
+      events: [...session.events],
+      values: { ...session.values },
+      metadata: session.metadata ? { ...session.metadata } : undefined,
+    }));
   }
 
   /**
