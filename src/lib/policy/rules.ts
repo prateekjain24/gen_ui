@@ -27,6 +27,25 @@ import { createDebugger } from '@/lib/utils/debug';
 const debug = createDebugger('RulesEngine');
 
 /**
+ * Performance benchmark wrapper for development mode
+ */
+function benchmark<T>(name: string, fn: () => T): T {
+  if (process.env.NODE_ENV === 'development') {
+    const start = performance.now();
+    const result = fn();
+    const duration = performance.now() - start;
+
+    if (duration > 100) {
+      console.warn(`[Rules Engine] ${name} exceeded 100ms: ${duration.toFixed(2)}ms`);
+    }
+
+    debug(`${name}: ${duration.toFixed(2)}ms`);
+    return result;
+  }
+  return fn();
+}
+
+/**
  * Main entry point for the rules engine.
  * Returns the next step plan based on session state.
  */
@@ -96,15 +115,15 @@ function getNextStep(session: SessionState): FormPlan | null {
   // Build the appropriate step
   switch (nextStepId) {
     case STEP_IDS.BASICS:
-      return createBasicsStep(session);
+      return benchmark('createBasicsStep', () => createBasicsStep(session));
     case STEP_IDS.WORKSPACE:
-      return createWorkspaceStep(session, persona);
+      return benchmark('createWorkspaceStep', () => createWorkspaceStep(session, persona));
     case STEP_IDS.PREFERENCES:
-      return createPreferencesStep(session, persona);
+      return benchmark('createPreferencesStep', () => createPreferencesStep(session, persona));
     case STEP_IDS.REVIEW:
-      return createReviewStep(session);
+      return benchmark('createReviewStep', () => createReviewStep(session));
     case STEP_IDS.SUCCESS:
-      return createSuccessStep(session);
+      return benchmark('createSuccessStep', () => createSuccessStep(session));
     default:
       debug(`Unhandled step: ${nextStepId}`);
       return null;
@@ -117,6 +136,16 @@ function getNextStep(session: SessionState): FormPlan | null {
 function detectPersona(session: SessionState): UserPersona {
   if (session.persona) {
     return session.persona;
+  }
+
+  const primaryUse = session.values[FIELD_IDS.PRIMARY_USE];
+  if (typeof primaryUse === 'string') {
+    if (['team', 'client', 'enterprise'].includes(primaryUse)) {
+      return 'team';
+    }
+    if (primaryUse === 'personal') {
+      return 'explorer';
+    }
   }
 
   const inferred = detectPersonaFromSession(session);
