@@ -286,17 +286,18 @@ Phase 1 establishes the core foundation with deterministic rules-based flow, del
 **Risks:**
 - Test maintenance overhead (keep mocks in sync with evolving APIs)
 
-### [P1-020] Development Environment & Documentation
+### [P1-020] Development Environment & Documentation ✅
 **Story Points:** 1
 **Dependencies:** [P1-019]
+**Status:** COMPLETE
 **Acceptance Criteria:**
-- [ ] Development server running smoothly
-- [ ] Debug panel in development mode
-- [ ] Basic README with setup instructions
-- [ ] Code comments for complex logic
+- [x] Development server running smoothly
+- [x] Debug panel in development mode
+- [x] Basic README with setup instructions
+- [x] Code comments for complex logic
 **Technical Notes:**
-- Add npm scripts for common tasks
-- Include troubleshooting section
+- Added dev-only `DebugPanel` gated by `NODE_ENV`/`NEXT_PUBLIC_DEBUG`, plus a helper script for `bun run dev:debug`.
+- Expanded project scripts (`test`, `check`, `format`) and rewrote README with setup, scripts, and troubleshooting guidance.
 **Risks:**
 - Documentation drift from code
 

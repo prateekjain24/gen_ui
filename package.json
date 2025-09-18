@@ -4,11 +4,18 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:debug": "node ./scripts/dev-debug.mjs",
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "bunx jest",
+    "test:watch": "bunx jest --watch",
+    "test:coverage": "bunx jest --coverage",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
+    "check": "bun run lint && bun run typecheck && bun run test"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",

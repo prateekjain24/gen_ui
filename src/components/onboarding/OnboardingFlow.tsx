@@ -4,8 +4,10 @@ import { Loader2 } from 'lucide-react';
 import * as React from 'react';
 
 import { FormRenderer } from '@/components/form/FormRenderer';
+import { DebugPanel } from '@/components/onboarding/DebugPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ENV } from '@/lib/constants';
 import { fetchPlan, createSession, updateSession } from '@/lib/api/onboarding';
 import { createTelemetryQueue, type TelemetryQueue } from '@/lib/telemetry/events';
 import type { ButtonAction, FormPlan, StepperItem } from '@/lib/types/form';
@@ -58,6 +60,7 @@ export function OnboardingFlow() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [planSource, setPlanSource] = React.useState<string>('rules');
+  const [lastPlanFetchedAt, setLastPlanFetchedAt] = React.useState<number | null>(null);
 
   const requestCounter = React.useRef(0);
   const telemetryRef = React.useRef<TelemetryQueue | null>(null);
@@ -89,6 +92,7 @@ export function OnboardingFlow() {
     return newSessionId;
   }, [sessionId]);
 
+  // Fetches the latest plan while ensuring only the newest request updates local state.
   const refreshPlan = React.useCallback(
     async (currentSessionId: string) => {
       const requestId = ++requestCounter.current;
@@ -100,6 +104,7 @@ export function OnboardingFlow() {
         if (requestCounter.current === requestId) {
           setPlan(nextPlan);
           setPlanSource(source);
+          setLastPlanFetchedAt(Date.now());
         }
       } catch (err) {
         if (requestCounter.current === requestId) {
@@ -129,6 +134,8 @@ export function OnboardingFlow() {
   React.useEffect(() => {
     initialise();
   }, [initialise]);
+
+  const shouldShowDebugPanel = ENV.isDevelopment || ENV.isDebug;
 
   React.useEffect(() => {
     if (!sessionId) {
@@ -257,6 +264,7 @@ export function OnboardingFlow() {
     []
   );
 
+  // Orchestrates button intents, persisting session state while emitting telemetry for analytics.
   const handleAction = React.useCallback(
     async (action: ButtonAction['action'], values: Record<string, unknown>) => {
       if (!sessionId || !plan) {
@@ -451,9 +459,6 @@ export function OnboardingFlow() {
 
   return (
     <div className={cn('space-y-4', isLoading && 'opacity-75 transition-opacity')}>
-      {planSource ? (
-        <p className="text-right text-xs text-muted-foreground">Plan source: {planSource}</p>
-      ) : null}
       <FormRenderer
         plan={plan}
         onAction={handleAction}
@@ -468,6 +473,17 @@ export function OnboardingFlow() {
         <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </div>
+      ) : null}
+      {shouldShowDebugPanel ? (
+        <DebugPanel
+          plan={plan}
+          planSource={planSource}
+          sessionId={sessionId}
+          isLoading={isLoading}
+          isSubmitting={isSubmitting}
+          error={error}
+          lastFetchedAt={lastPlanFetchedAt}
+        />
       ) : null}
     </div>
   );
