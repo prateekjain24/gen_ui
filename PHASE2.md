@@ -91,10 +91,10 @@ Phase 2 adds AI-powered decision making, telemetry, A/B testing, and production 
 **Story Points:** 1
 **Dependencies:** [P1-004]
 **Acceptance Criteria:**
-- [ ] Hesitation detection (>5s on field)
-- [ ] Correction pattern detection
-- [ ] Abandonment risk scoring
-- [ ] Time-on-step calculation
+- [x] Hesitation detection (>5s on field)
+- [x] Correction pattern detection
+- [x] Abandonment risk scoring
+- [x] Time-on-step calculation
 **Technical Notes:**
 - Use sliding window for analysis
 - Cache computed metrics
@@ -105,8 +105,8 @@ Phase 2 adds AI-powered decision making, telemetry, A/B testing, and production 
 **Story Points:** 1
 **Dependencies:** [P2-006, P1-012]
 **Acceptance Criteria:**
-- [ ] Rules engine as primary (fast path)
-- [ ] LLM as secondary with timeout
+- [ ] Rules engine as secondary (fast path)
+- [ ] LLM as primary with timeout 10 sec
 - [ ] Fallback to basic rules
 - [ ] Decision source tracking
 **Technical Notes:**
