@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sessionStore } from '@/lib/store/session';
+
 import { getNextStepPlan } from '@/lib/policy/rules';
+import { sessionStore } from '@/lib/store/session';
 import { createDebugger } from '@/lib/utils/debug';
 
 const debug = createDebugger('PlanAPI');

@@ -19,6 +19,8 @@ import {
   NOTIFICATION_OPTIONS,
 } from '@/lib/constants';
 import type { FormPlan, Field, StepperItem } from '@/lib/types/form';
+import { detectPersona as detectPersonaFromSession }
+  from '@/lib/types/session';
 import type { SessionState, UserPersona } from '@/lib/types/session';
 import { createDebugger } from '@/lib/utils/debug';
 
@@ -79,7 +81,7 @@ function getNextStep(session: SessionState): FormPlan | null {
   const nextStepId = DEFAULT_STEP_ORDER[nextStepIndex];
 
   // Detect persona based on primary_use field
-  const persona = detectPersona(session.values);
+  const persona = detectPersona(session);
 
   // Check if we should skip this step based on persona
   if (shouldSkipStep(nextStepId, persona)) {
@@ -112,21 +114,13 @@ function getNextStep(session: SessionState): FormPlan | null {
 /**
  * Detect user persona based on collected values.
  */
-function detectPersona(values: Record<string, unknown>): UserPersona {
-  const primaryUse = values[FIELD_IDS.PRIMARY_USE] as string;
-
-  // Personal use indicates explorer persona
-  if (primaryUse === 'personal') {
-    return 'explorer';
+function detectPersona(session: SessionState): UserPersona {
+  if (session.persona) {
+    return session.persona;
   }
 
-  // Team, client, enterprise indicate team persona
-  if (primaryUse === 'team' || primaryUse === 'client' || primaryUse === 'enterprise') {
-    return 'team';
-  }
-
-  // Default to explorer if not specified
-  return 'explorer';
+  const inferred = detectPersonaFromSession(session);
+  return inferred ?? 'explorer';
 }
 
 /**
@@ -198,7 +192,7 @@ function createBasicsStep(session: SessionState): FormPlan {
         action: 'submit_step',
       },
     },
-    stepper: buildStepperItems(session),
+    stepper: buildStepperItems(session, STEP_IDS.BASICS),
   };
 }
 
@@ -268,7 +262,7 @@ function createWorkspaceStep(session: SessionState, persona: UserPersona): FormP
         action: 'back',
       },
     },
-    stepper: buildStepperItems(session),
+    stepper: buildStepperItems(session, STEP_IDS.WORKSPACE),
   };
 }
 
@@ -319,7 +313,7 @@ function createPreferencesStep(session: SessionState, _persona: UserPersona): Fo
         action: 'back',
       },
     },
-    stepper: buildStepperItems(session),
+    stepper: buildStepperItems(session, STEP_IDS.PREFERENCES),
   };
 }
 
@@ -426,7 +420,7 @@ function createReviewStep(session: SessionState): FormPlan {
   return {
     kind: 'review',
     summary,
-    stepper: buildStepperItems(session),
+    stepper: buildStepperItems(session, STEP_IDS.REVIEW),
   };
 }
 
@@ -434,7 +428,7 @@ function createReviewStep(session: SessionState): FormPlan {
  * Create the success step with persona-aware message.
  */
 function createSuccessStep(session: SessionState): FormPlan {
-  const persona = detectPersona(session.values);
+  const persona = session.persona ?? detectPersona(session);
   const name = session.values[FIELD_IDS.FULL_NAME] as string || 'there';
   const firstName = name.split(' ')[0];
 
@@ -451,8 +445,9 @@ function createSuccessStep(session: SessionState): FormPlan {
 /**
  * Build stepper items for progress indication.
  */
-function buildStepperItems(session: SessionState): StepperItem[] {
-  const persona = detectPersona(session.values);
+function buildStepperItems(session: SessionState, activeStepId?: string): StepperItem[] {
+  const persona = session.persona ?? detectPersona(session);
+  const currentActiveStep = activeStepId ?? session.currentStep;
 
   // Filter steps based on persona
   const visibleSteps = DEFAULT_STEP_ORDER.filter(stepId => {
@@ -466,7 +461,7 @@ function buildStepperItems(session: SessionState): StepperItem[] {
   return visibleSteps.map((stepId) => ({
     id: stepId,
     label: getStepLabel(stepId),
-    active: stepId === session.currentStep,
+    active: stepId === currentActiveStep,
     completed: session.completedSteps.includes(stepId),
   }));
 }
