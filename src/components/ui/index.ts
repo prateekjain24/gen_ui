@@ -1,5 +1,7 @@
-/**
- * Placeholder barrel for shadcn/ui exports.
- * Populate with generated components during Phase 1 UI tasks.
- */
-export {};
+export * from './button';
+export * from './card';
+export * from './checkbox';
+export * from './input';
+export * from './label';
+export * from './radio-group';
+export * from './select';

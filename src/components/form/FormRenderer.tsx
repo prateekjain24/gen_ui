@@ -1,12 +1,193 @@
-import type { FormPlan } from '@/lib/types/form';
+'use client';
 
-/**
- * Placeholder renderer until UI wiring lands.
- */
-export function FormRenderer(_props: { plan: FormPlan }) {
+import { AlertTriangle, CheckCircle } from 'lucide-react';
+import * as React from 'react';
+
+import { Field as FieldComponent } from './Field';
+import { FormContainer } from './FormContainer';
+import { Stepper } from './Stepper';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import type { ButtonAction, Field, FormPlan } from '@/lib/types/form';
+import { isErrorPlan, isRenderStepPlan, isReviewPlan, isSuccessPlan } from '@/lib/types/form';
+import { cn } from '@/lib/utils';
+
+interface FormRendererProps {
+  plan: FormPlan;
+  onAction?: (action: ButtonAction['action'], values: Record<string, unknown>) => void;
+  onFieldChange?: (fieldId: string, value: string | string[] | undefined) => void;
+  onFieldFocus?: (fieldId: string) => void;
+  onFieldBlur?: (fieldId: string) => void;
+  isSubmitting?: boolean;
+  error?: string | null;
+  className?: string;
+}
+
+type FieldValues = Record<string, string | string[]>;
+
+const getInitialFieldValues = (fields: Field[]): FieldValues => {
+  return fields.reduce<FieldValues>((acc, field) => {
+    switch (field.kind) {
+      case 'checkbox':
+        acc[field.id] = Array.isArray(field.values) ? field.values : [];
+        break;
+      case 'select':
+      case 'radio':
+      case 'text':
+        acc[field.id] = field.value ?? '';
+        break;
+    }
+    return acc;
+  }, {});
+};
+
+const StepSummary = ({ plan }: { plan: Extract<FormPlan, { kind: 'review' }> }) => {
   return (
-    <div className="rounded border border-dashed p-4 text-sm text-muted-foreground">
-      Form renderer not yet implemented. See P1-014 and P1-015.
-    </div>
+    <Card className="mx-auto w-full max-w-2xl">
+      <CardHeader>
+        <CardTitle className="text-xl sm:text-2xl">Review your details</CardTitle>
+        <CardDescription>Confirm the information below before finishing.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <dl className="space-y-4">
+          {plan.summary.map(item => (
+            <div key={item.label} className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+              <dt className="text-sm font-medium text-muted-foreground">{item.label}</dt>
+              <dd className="text-sm font-semibold text-foreground sm:text-right">{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </CardContent>
+    </Card>
   );
+};
+
+const ResultCard = ({
+  icon,
+  title,
+  message,
+  tone,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  message: string;
+  tone: 'success' | 'error';
+}) => {
+  const toneClasses = tone === 'success' ? 'text-primary' : 'text-destructive';
+  return (
+    <Card className="mx-auto w-full max-w-lg text-center">
+      <CardHeader className="items-center space-y-3">
+        <div className={cn('flex h-12 w-12 items-center justify-center rounded-full bg-muted', toneClasses)}>{icon}</div>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{message}</CardDescription>
+      </CardHeader>
+    </Card>
+  );
+};
+
+export function FormRenderer({
+  plan,
+  onAction,
+  onFieldChange,
+  onFieldFocus,
+  onFieldBlur,
+  isSubmitting,
+  error,
+  className,
+}: FormRendererProps) {
+  const [fieldValues, setFieldValues] = React.useState<FieldValues>({});
+  const isRenderStep = plan.kind === 'render_step';
+  const activeStepId = isRenderStep ? plan.step.stepId : undefined;
+  const fieldSignature = isRenderStep
+    ? plan.step.fields.map(field => `${field.id}:${field.kind}`).join('|')
+    : '';
+
+  React.useEffect(() => {
+    if (!isRenderStep) {
+      setFieldValues({});
+      return;
+    }
+    setFieldValues(getInitialFieldValues(plan.step.fields));
+  }, [isRenderStep, activeStepId, fieldSignature, plan]);
+
+  const handleValueChange = (fieldId: string, value: string | string[] | undefined) => {
+    setFieldValues(current => ({ ...current, [fieldId]: value ?? '' }));
+    onFieldChange?.(fieldId, value);
+  };
+
+  const handleAction = (action: ButtonAction['action']) => {
+    if (!isRenderStepPlan(plan)) {
+      onAction?.(action, {});
+      return;
+    }
+    onAction?.(action, fieldValues);
+  };
+
+  if (isRenderStepPlan(plan)) {
+    const { step, stepper } = plan;
+
+    return (
+      <div className={cn('space-y-6', className)}>
+        <FormContainer
+          title={step.title}
+          description={step.description}
+          primaryAction={step.primaryCta}
+          secondaryAction={step.secondaryCta}
+          onSubmit={(_, action) => handleAction(action.action)}
+          onAction={action => handleAction(action)}
+          stepper={<Stepper steps={stepper} activeStepId={activeStepId} />}
+          isSubmitting={isSubmitting}
+          error={error}
+        >
+          {step.fields.map(field => (
+            <FieldComponent
+              key={field.id}
+              field={field}
+              value={fieldValues[field.id]}
+              onValueChange={value => handleValueChange(field.id, value)}
+              onFocus={onFieldFocus}
+              onBlur={onFieldBlur}
+            />
+          ))}
+        </FormContainer>
+      </div>
+    );
+  }
+
+  if (isReviewPlan(plan)) {
+    return (
+      <div className={cn('space-y-6', className)}>
+        <Stepper steps={plan.stepper} activeStepId={activeStepId} />
+        <StepSummary plan={plan} />
+        <div className="mx-auto flex w-full max-w-2xl justify-end">
+          <Button onClick={() => handleAction('complete')}>Confirm &amp; finish</Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isSuccessPlan(plan)) {
+    return (
+      <ResultCard
+        icon={<CheckCircle className="h-6 w-6" />}
+        title="All set!"
+        message={plan.message}
+        tone="success"
+      />
+    );
+  }
+
+  if (isErrorPlan(plan)) {
+    return (
+      <ResultCard
+        icon={<AlertTriangle className="h-6 w-6" />}
+        title="Something went wrong"
+        message={plan.message}
+        tone="error"
+      />
+    );
+  }
+
+  return null;
 }

@@ -18,6 +18,8 @@ export interface FieldOption {
   label: string;
   /** Whether this option is disabled */
   disabled?: boolean;
+  /** Additional helper copy displayed for the option */
+  helperText?: string;
 }
 
 /**

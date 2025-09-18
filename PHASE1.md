@@ -196,47 +196,50 @@ Phase 1 establishes the core foundation with deterministic rules-based flow, del
 **Risks:**
 - Event ordering may be important for richer analytics; current heuristics assume approximate chronology
 
-### [P1-014] UI Component - Field Renderer
+### [P1-014] UI Component - Field Renderer ✅
 **Story Points:** 1
 **Dependencies:** [P1-002]
+**Status:** COMPLETE
 **Acceptance Criteria:**
-- [ ] Text input rendering with validation
-- [ ] Radio group with helper text
-- [ ] Checkbox group with multi-select
-- [ ] Select dropdown with options
+- [x] Text input rendering with validation
+- [x] Radio group with helper text
+- [x] Checkbox group with multi-select
+- [x] Select dropdown with options
 **Technical Notes:**
-- Use shadcn/ui components as base
-- Maintain consistent error display
+- Implemented `Field` with shadcn-style primitives (input, select, radio, checkbox) and consistent helper/error messaging
+- Normalizes option metadata (helper text, disabled states) and maintains accessibility attributes (`aria-describedby`, required markers)
 **Risks:**
-- Browser compatibility for form controls
+- Browser compatibility for form controls (monitor for Radix quirks on legacy browsers)
 
-### [P1-015] UI Component - Form Container
+### [P1-015] UI Component - Form Container ✅
 **Story Points:** 1
 **Dependencies:** [P1-014]
+**Status:** COMPLETE
 **Acceptance Criteria:**
-- [ ] Card layout with header/content/footer
-- [ ] Form submission handling
-- [ ] Loading states with spinner
-- [ ] Error boundary implemented
+- [x] Card layout with header/content/footer
+- [x] Form submission handling
+- [x] Loading states with spinner
+- [x] Error boundary implemented
 **Technical Notes:**
-- Use React Hook Form for validation
-- Implement optimistic updates
+- `FormContainer` wraps shadcn `Card`, drives CTA buttons, exposes submission callbacks, and surfaces request errors inline
+- Added lightweight error boundary with `debugError` logging to shield runtime issues without crashing the flow
 **Risks:**
-- Form state management complexity
+- Form state management complexity (prepare to integrate actual orchestrator handlers in P1-017)
 
-### [P1-016] UI Component - Progress Stepper
+### [P1-016] UI Component - Progress Stepper ✅
 **Story Points:** 1
 **Dependencies:** [P1-003]
+**Status:** COMPLETE
 **Acceptance Criteria:**
-- [ ] Visual progress bar component
-- [ ] Step indicators with active/completed states
-- [ ] Responsive design for mobile
-- [ ] Smooth transitions between steps
+- [x] Visual progress bar component
+- [x] Step indicators with active/completed states
+- [x] Responsive design for mobile
+- [x] Smooth transitions between steps
 **Technical Notes:**
-- Use CSS transitions for animations
-- Consider accessibility (ARIA labels)
+- Stepper computes progress with completed/active weighting, adds animated bar, and labels step states for screen readers
+- Responsive flex layout keeps labels legible on narrow viewports
 **Risks:**
-- Complex styling across browsers
+- Complex styling across browsers (continue visual QA as branding evolves)
 
 ### [P1-017] Onboarding Flow Orchestrator
 **Story Points:** 1
