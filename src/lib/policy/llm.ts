@@ -86,8 +86,6 @@ export async function generatePlanWithLLM(session: SessionState): Promise<FormPl
             model: openai(LLM_CONFIG.model),
             system: SYSTEM_PROMPTS.FORM_ORCHESTRATOR,
             prompt: buildPrompt(session),
-            temperature: LLM_CONFIG.temperature,
-            topP: LLM_CONFIG.topP,
             maxOutputTokens: LLM_CONFIG.maxTokens,
             abortSignal: signal,
             maxRetries: 0,
@@ -111,6 +109,10 @@ export async function generatePlanWithLLM(session: SessionState): Promise<FormPl
     );
 
     debug(`LLM response captured (${responseText.length} chars)`);
+
+    if (!responseText.trim()) {
+      throw new LLMResponseValidationError('LLM returned an empty response');
+    }
 
     const parsed = parseLLMDecisionFromText(responseText, session);
     debug(`LLM decision parsed with confidence ${parsed.metadata.confidence}`);

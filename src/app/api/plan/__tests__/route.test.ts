@@ -122,7 +122,7 @@ describe('POST /api/plan', () => {
   });
 
   it('returns LLM plan when strategy is llm and generation succeeds', async () => {
-    const session = createSession();
+    const session = createSession({ values: { full_name: 'Alice' } });
     sessionStore.getSession.mockReturnValue(session);
 
     const rulesPlan: FormPlan = {

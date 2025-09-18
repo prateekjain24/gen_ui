@@ -65,6 +65,8 @@ export function OnboardingFlow() {
   const [planSource, setPlanSource] = React.useState<string>('rules');
   const [llmStrategy, setLlmStrategy] = React.useState<'llm' | 'rules'>(DEFAULT_LLM_STRATEGY);
   const [lastPlanFetchedAt, setLastPlanFetchedAt] = React.useState<number | null>(null);
+  const [fallbackNotice, setFallbackNotice] = React.useState<string | null>(null);
+  const [hasCollectedSignals, setHasCollectedSignals] = React.useState<boolean>(false);
 
   const requestCounter = React.useRef(0);
   const telemetryRef = React.useRef<TelemetryQueue | null>(null);
@@ -112,19 +114,28 @@ export function OnboardingFlow() {
     async (currentSessionId: string, overrideStrategy?: 'auto' | 'llm' | 'rules') => {
       const requestId = ++requestCounter.current;
       setIsLoading(true);
-      setError(null);
+
+      if (!overrideStrategy) {
+        setError(null);
+      }
 
       try {
-        const strategy = overrideStrategy ?? (llmStrategy === 'llm' ? 'llm' : 'rules');
-        const { plan: nextPlan, source } = await fetchPlan(currentSessionId, { strategy });
+        const hasSignals = hasCollectedSignals || planSource === 'llm';
+        const desiredStrategy = overrideStrategy ?? (llmStrategy === 'llm' && hasSignals ? 'llm' : 'rules');
+        const { plan: nextPlan, source } = await fetchPlan(currentSessionId, { strategy: desiredStrategy });
+
         if (requestCounter.current === requestId) {
           setPlan(nextPlan);
           setPlanSource(source);
           setLastPlanFetchedAt(Date.now());
           if (source === 'fallback') {
-            setError('AI temporarily unavailable – continuing with rules-based plan.');
+            setFallbackNotice('AI temporarily unavailable – continuing with rules-based plan.');
           } else {
+            setFallbackNotice(null);
             setError(null);
+          }
+          if (source === 'llm') {
+            setHasCollectedSignals(true);
           }
         }
       } catch (err) {
@@ -138,13 +149,15 @@ export function OnboardingFlow() {
         }
       }
     },
-    [llmStrategy]
+    [hasCollectedSignals, llmStrategy, planSource]
   );
 
   const initialise = React.useCallback(async () => {
     try {
       const id = await ensureSession();
-      await refreshPlan(id);
+      setHasCollectedSignals(false);
+      setFallbackNotice(null);
+      await refreshPlan(id, 'rules');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to initialise onboarding';
       setError(message);
@@ -161,6 +174,7 @@ export function OnboardingFlow() {
   const handleStrategyChange = React.useCallback(
     (next: 'llm' | 'rules') => {
       setLlmStrategy(next);
+      setFallbackNotice(null);
       if (typeof window !== 'undefined') {
         window.sessionStorage.setItem(LLM_STRATEGY_STORAGE_KEY, next);
       }
@@ -351,6 +365,8 @@ export function OnboardingFlow() {
         const mergedValues = { ...fieldValuesRef.current, ...sanitizedValues };
         fieldValuesRef.current = mergedValues;
 
+        setHasCollectedSignals(true);
+
         await persist({
           values,
           currentStep: activeStepId,
@@ -368,6 +384,8 @@ export function OnboardingFlow() {
             reason: 'user_action',
           });
         }
+
+        setHasCollectedSignals(true);
 
         await persist({
           currentStep: activeStepId,
@@ -504,6 +522,11 @@ export function OnboardingFlow() {
         error={error}
         className={isLoading ? 'pointer-events-none' : undefined}
       />
+      {fallbackNotice ? (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {fallbackNotice}
+        </div>
+      ) : null}
       {error && plan ? (
         <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
@@ -520,6 +543,7 @@ export function OnboardingFlow() {
           lastFetchedAt={lastPlanFetchedAt}
           llmStrategy={llmStrategy}
           onStrategyChange={handleStrategyChange}
+          fallbackNotice={fallbackNotice}
         />
       ) : null}
     </div>

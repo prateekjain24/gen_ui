@@ -16,17 +16,11 @@ export const LLM_CONFIG = {
   /** OpenAI model to use for form decisions */
   model: configuredModel,
 
-  /** Temperature for response generation (lower = more deterministic) */
-  temperature: 0.3,
-
   /** Maximum tokens for response */
   maxTokens: 1000,
 
   /** Timeout for LLM calls in milliseconds */
-  timeout: 2000,
-
-  /** Top-p sampling parameter */
-  topP: 0.9,
+  timeout: 15000,
 
   /** Frequency penalty to reduce repetition */
   frequencyPenalty: 0.0,

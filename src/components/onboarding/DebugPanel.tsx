@@ -16,6 +16,7 @@ interface DebugPanelProps {
   readonly lastFetchedAt: number | null;
   readonly llmStrategy: 'llm' | 'rules';
   readonly onStrategyChange?: (strategy: 'llm' | 'rules') => void;
+  readonly fallbackNotice?: string | null;
 }
 
 function formatTimestamp(timestamp: number | null): string {
@@ -112,6 +113,7 @@ export function DebugPanel({
   lastFetchedAt,
   llmStrategy,
   onStrategyChange,
+  fallbackNotice,
 }: DebugPanelProps) {
   const planSummary = React.useMemo(() => getPlanSummary(plan), [plan]);
   const prettyPlan = React.useMemo(() => (plan ? JSON.stringify(plan, null, 2) : 'No plan loaded yet.'), [plan]);
@@ -138,6 +140,7 @@ export function DebugPanel({
           <DebugRow label="Last fetch" value={formatTimestamp(lastFetchedAt)} />
           <DebugRow label="Status" value={isLoading ? 'Fetching plan…' : isSubmitting ? 'Submitting data…' : 'Idle'} />
           <DebugRow label="Error" value={error ?? 'None'} />
+          <DebugRow label="Fallback" value={fallbackNotice ?? 'None'} />
         </div>
         <div className="flex flex-col gap-2 rounded-md border border-border/60 bg-background/70 p-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm">

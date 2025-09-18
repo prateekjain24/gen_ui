@@ -71,8 +71,13 @@ export async function POST(req: NextRequest) {
     let finalPlan = rulesPlan;
     let source: DecisionSource = DECISION_SOURCES.RULES;
 
+    const hasSignals =
+      session.events.length > 0 ||
+      session.completedSteps.length > 0 ||
+      Object.keys(session.values ?? {}).length > 0;
+
     const forcedLLM = strategy === 'llm';
-    const allowLLM = forcedLLM || (strategy === 'auto' && shouldUseLLM(session.id));
+    const allowLLM = (forcedLLM || (strategy === 'auto' && shouldUseLLM(session.id))) && hasSignals;
 
     if (allowLLM) {
       const llmPlan = await generatePlanWithLLM(session);
