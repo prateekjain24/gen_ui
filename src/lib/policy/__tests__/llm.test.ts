@@ -21,6 +21,14 @@ jest.mock('@/lib/llm/client', () => {
   };
 });
 
+jest.mock('@/lib/llm/response-parser', () => {
+  const actual = jest.requireActual('@/lib/llm/response-parser');
+  return {
+    ...actual,
+    parseLLMDecisionFromText: jest.fn(),
+  };
+});
+
 const baseSession = (): SessionState => ({
   id: 'session-123',
   createdAt: new Date('2025-01-01T00:00:00Z'),
@@ -43,6 +51,7 @@ describe('generatePlanWithLLM', () => {
     retryWithExponentialBackoff: jest.Mock;
     shouldRetryOnError: jest.Mock;
   };
+  const getParserMock = () => jest.requireMock('@/lib/llm/response-parser').parseLLMDecisionFromText as jest.Mock;
 
   beforeEach(() => {
     jest.resetModules();
@@ -99,6 +108,7 @@ describe('generatePlanWithLLM', () => {
 
     const usageRecorder = getUsageRecorder();
     const generateTextMock = getGenerateTextMock();
+    const parseMock = getParserMock();
     generateTextMock.mockResolvedValue({
       text: '{"kind":"success"}',
       usage: {
@@ -107,12 +117,46 @@ describe('generatePlanWithLLM', () => {
         totalTokens: 16,
       },
     });
+    const plan = {
+      kind: 'render_step',
+      step: {
+        stepId: 'workspace',
+        title: 'Configure workspace',
+        fields: [
+          {
+            kind: 'text',
+            id: 'workspace_name',
+            label: 'Workspace Name',
+            required: false,
+          },
+        ],
+        primaryCta: { label: 'Continue', action: 'submit_step' },
+      },
+      stepper: [],
+    } as const;
+    const rawStepConfig = {
+      stepId: 'workspace',
+      title: 'Configure workspace',
+      fields: [
+        {
+          kind: 'text',
+          id: 'workspace_name',
+          label: 'Workspace Name',
+        },
+      ],
+      primaryCta: { label: 'Continue', action: 'submit_step' },
+    };
+    parseMock.mockReturnValue({
+      metadata: { reasoning: 'test', confidence: 0.8, decision: 'progress' },
+      raw: rawStepConfig,
+      plan,
+    });
 
     const { generatePlanWithLLM } = await import('@/lib/policy/llm');
 
     const result = await generatePlanWithLLM(baseSession());
 
-    expect(result).toBeNull();
+    expect(result).toEqual(plan);
     expect(clientMocks.getOpenAIProvider).toHaveBeenCalledTimes(1);
     expect(provider).toHaveBeenCalledWith('gpt-5-mini-test');
     expect(generateTextMock).toHaveBeenCalledTimes(1);
@@ -121,6 +165,7 @@ describe('generatePlanWithLLM', () => {
       outputTokens: 5,
       totalTokens: 16,
     });
+    expect(parseMock).toHaveBeenCalledTimes(1);
   });
 
   it('handles errors from the retry helper gracefully', async () => {

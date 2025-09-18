@@ -12,6 +12,7 @@ import {
   shouldRetryOnError,
 } from '@/lib/llm/client';
 import { buildLLMUserContext, formatLLMUserContext } from '@/lib/llm/context';
+import { LLMResponseValidationError, parseLLMDecisionFromText } from '@/lib/llm/response-parser';
 import { recordLLMUsage } from '@/lib/llm/usage-tracker';
 import type { FormPlan } from '@/lib/types/form';
 import type { SessionState } from '@/lib/types/session';
@@ -110,9 +111,16 @@ export async function generatePlanWithLLM(session: SessionState): Promise<FormPl
 
     debug(`LLM response captured (${responseText.length} chars)`);
 
-    // TODO (P2-002/P2-005): parse structured plan from responseText.
-    return null;
+    const parsed = parseLLMDecisionFromText(responseText, session);
+    debug(`LLM decision parsed with confidence ${parsed.metadata.confidence}`);
+
+    return parsed.plan;
   } catch (error) {
+    if (error instanceof LLMResponseValidationError) {
+      debugError('LLM response validation failed', error);
+      return null;
+    }
+
     const mappedError = mapToLLMServiceError(error);
     debugError('LLM plan generation failed', mappedError);
     return null;
