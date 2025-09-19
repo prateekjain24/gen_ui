@@ -4,12 +4,14 @@ import { Check, Clipboard } from "lucide-react";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
+import type { PersonalizationFallbackMeta } from "@/lib/personalization/scoring";
 import { summarizePromptSignals } from "@/lib/prompt-intel";
 import type { PromptSignals } from "@/lib/prompt-intel/types";
 import { cn } from "@/lib/utils";
 
 interface PromptSignalsDebugPanelProps {
   signals: PromptSignals;
+  fallback?: PersonalizationFallbackMeta;
   className?: string;
 }
 
@@ -32,7 +34,7 @@ const formatValue = (value: unknown): string => {
   return String(value);
 };
 
-export function PromptSignalsDebugPanel({ signals, className }: PromptSignalsDebugPanelProps): React.ReactElement {
+export function PromptSignalsDebugPanel({ signals, fallback, className }: PromptSignalsDebugPanelProps): React.ReactElement {
   const summary = React.useMemo(() => summarizePromptSignals(signals), [signals]);
   const [copied, setCopied] = React.useState(false);
 
@@ -71,6 +73,37 @@ export function PromptSignalsDebugPanel({ signals, className }: PromptSignalsDeb
           )}
         </Button>
       </div>
+
+      {fallback ? (
+        <div
+          role="status"
+          className={cn(
+            "mt-4 rounded-md border px-3 py-2 text-xs",
+            fallback.applied
+              ? "border-amber-400/60 bg-amber-100/40 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
+              : "border-emerald-400/50 bg-emerald-100/40 text-emerald-900 dark:border-emerald-400/40 dark:bg-emerald-500/10 dark:text-emerald-200"
+          )}
+        >
+          <div className="font-semibold uppercase tracking-wide">
+            {fallback.applied ? "Fallback enforced" : "Personalization active"}
+          </div>
+          <div className="mt-1">
+            Aggregate confidence: {fallback.aggregateConfidence.toFixed(2)}
+          </div>
+          {fallback.details.length ? (
+            <ul className="mt-1 list-disc pl-4">
+              {fallback.details.map(detail => (
+                <li key={detail}>{detail}</li>
+              ))}
+            </ul>
+          ) : null}
+          {!fallback.applied && !fallback.details.length ? (
+            <div className="mt-1 text-muted-foreground/80">
+              No guardrails triggered.
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         {summary.map(item => (

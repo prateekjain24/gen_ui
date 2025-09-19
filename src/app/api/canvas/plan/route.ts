@@ -16,6 +16,7 @@ import {
 } from "@/lib/llm/client";
 import { logCanvasDecision } from "@/lib/llm/eval-logger";
 import { recordLLMUsage } from "@/lib/llm/usage-tracker";
+import { scoreRecipeKnobs, type RecipePersonalizationResult } from "@/lib/personalization/scoring";
 import { buildPromptSignals, summarizePromptSignals } from "@/lib/prompt-intel";
 import type { PromptSignals } from "@/lib/prompt-intel/types";
 import { sessionStore } from "@/lib/store/session";
@@ -108,7 +109,10 @@ type CanvasDecisionResponse = {
   reasoning: string;
   decisionSource: "llm" | "heuristics";
   promptSignals: PromptSignals;
+  personalization: RecipePersonalizationResult;
 };
+
+type CanvasDecisionResponseBase = Omit<CanvasDecisionResponse, "promptSignals" | "personalization">;
 
 const sanitizeReasoning = (value: string): string => {
   const trimmed = value.trim();
@@ -335,7 +339,7 @@ export async function POST(req: NextRequest) {
     const { message, domainEmail, teamSize, metadata, sessionId } = parsedBody.data;
     const heuristicsDecision = classifyByHeuristics(message);
 
-    let responsePayload: Omit<CanvasDecisionResponse, 'promptSignals'> = {
+    let responsePayload: CanvasDecisionResponseBase = {
       recipeId: heuristicsDecision.recipeId,
       persona: heuristicsDecision.persona,
       intentTags: heuristicsDecision.intentTags,
@@ -391,9 +395,11 @@ export async function POST(req: NextRequest) {
     const recipeForLog = getRecipe(responsePayload.recipeId);
 
     const promptSignals = await buildPromptSignals(message);
+    const personalization = scoreRecipeKnobs(responsePayload.recipeId, promptSignals);
     const responsePayloadWithSignals: CanvasDecisionResponse = {
       ...responsePayload,
       promptSignals,
+      personalization,
     };
 
     if (sessionId) {
@@ -427,6 +433,7 @@ export async function POST(req: NextRequest) {
       llmConfidence,
       llmRawResponse: rawLlmResponse,
       rawDecision: llmResult?.decision ?? null,
+      personalizationFallback: personalization.fallback,
     });
 
     return NextResponse.json(responsePayloadWithSignals);

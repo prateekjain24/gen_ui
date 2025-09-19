@@ -13,6 +13,7 @@ import { canvasCopy } from "@/lib/canvas/copy";
 import type { CanvasRecipe, CanvasRecipeId } from "@/lib/canvas/recipes";
 import { getRecipe } from "@/lib/canvas/recipes";
 import { ENV } from "@/lib/constants";
+import type { RecipePersonalizationResult } from "@/lib/personalization/scoring";
 import type { PromptSignals } from "@/lib/prompt-intel/types";
 import { createTelemetryQueue, type TelemetryQueue } from "@/lib/telemetry/events";
 import type { Field, FormPlan, StepperItem } from "@/lib/types/form";
@@ -28,6 +29,7 @@ interface CanvasPlanResponse {
   reasoning: string;
   decisionSource: CanvasDecisionSource;
   promptSignals: PromptSignals;
+  personalization: RecipePersonalizationResult;
 }
 
 interface CanvasPlanState extends CanvasPlanResponse {
@@ -397,6 +399,11 @@ export function CanvasChat(): React.ReactElement {
                   <span className="text-xs uppercase tracking-wide text-muted-foreground/80">
                     Decision source: {plan.decisionSource === "llm" ? "LLM recommendation" : "Heuristics fallback"}
                   </span>
+                  {plan.personalization.fallback.applied ? (
+                    <span className="text-xs text-amber-600 dark:text-amber-400">
+                      Personalization fallback triggered ({plan.personalization.fallback.reasons.join(", ")}). You can tweak the fields below manually.
+                    </span>
+                  ) : null}
                   {!enableExperimentalComponents ? (
                     <span className="text-xs text-muted-foreground">
                       Experimental components are disabled, so some rich fields may not render.
@@ -428,7 +435,10 @@ export function CanvasChat(): React.ReactElement {
               </Card>
 
               {ENV.isDebug ? (
-                <PromptSignalsDebugPanel signals={plan.promptSignals} />
+                <PromptSignalsDebugPanel
+                  signals={plan.promptSignals}
+                  fallback={plan.personalization.fallback}
+                />
               ) : null}
             </div>
           ) : null}

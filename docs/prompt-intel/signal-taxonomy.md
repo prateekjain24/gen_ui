@@ -37,6 +37,12 @@ This taxonomy enumerates the prompt-derived signals required for Phase 4 persona
 - **Hybrid**: `decisionMakers`, `approvalChainDepth`, `integrationCriticality`, `industry`, `primaryObjective`, `constraints`, `operatingRegion` (LLM fills or clarifies after keyword pass but deterministic cues win on conflict unless LLM confidence > 0.75).
 - **Metadata**: Always system generated post-merge.
 
+## Personalization Fallback Guardrails
+- Aggregate personalization confidence below **0.50** triggers a full fallback to Phase 3 defaults. The score is the average confidence of signals that attempted to adjust knobs.
+- High-confidence compliance cues paired with fast/onboarding tone requests yield a `conflict_governance_vs_fast` fallback to avoid inconsistent messaging.
+- Solo team detections that conflict with multiple high-confidence decision makers raise `conflict_solo_vs_team`, keeping defaults until humans resolve the ambiguity.
+- Fallback reasons are surfaced in the debug HUD (`scoreRecipeKnobs` metadata) and persisted via telemetry for auditability.
+
 ## Example Prompts
 
 **Prompt A**

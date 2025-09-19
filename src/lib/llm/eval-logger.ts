@@ -5,6 +5,7 @@ import type { CanvasRecipeId } from '@/lib/canvas/recipes';
 import { EVAL_LOG_CONFIG, LLM_CONFIG, PROMPT_VERSION } from '@/lib/constants';
 import { buildLLMUserContext } from '@/lib/llm/context';
 import type { LLMDecisionMetadata } from '@/lib/llm/response-parser';
+import type { PersonalizationFallbackMeta } from '@/lib/personalization/scoring';
 import type { FormPlan } from '@/lib/types/form';
 import type { SessionState } from '@/lib/types/session';
 import { createDebugger, debugError } from '@/lib/utils/debug';
@@ -116,6 +117,7 @@ export interface CanvasDecisionLog {
   llmConfidence?: number | null;
   llmRawResponse?: string | null;
   rawDecision?: unknown;
+  personalizationFallback?: PersonalizationFallbackMeta;
 }
 
 function resolveCanvasLogDir(): string {
