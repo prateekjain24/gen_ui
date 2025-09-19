@@ -22,7 +22,7 @@ jest.mock("@/lib/llm/client", () => ({
       operation(new AbortController().signal)
   ),
   retryWithExponentialBackoff: jest.fn(
-    (operation: (attempt: number) => Promise<unknown>, _settings: unknown, _hooks?: unknown) =>
+    async (operation: (attempt: number) => Promise<unknown>, _settings: unknown, _hooks?: unknown) =>
       operation(1)
   ),
   shouldRetryOnError: jest.fn(() => true),
@@ -69,10 +69,21 @@ describe("POST /api/canvas/plan", () => {
   });
 
   it("returns LLM decision when confidence is high", async () => {
-    generateText.mockResolvedValue({
+    generateText
+      .mockResolvedValueOnce({
       text: '{"persona":"team","recipe_id":"R3","intent_tags":["client","integrations"],"confidence":0.82,"reasoning":"Mentioned client stakeholders and integrations"}',
       usage: { totalTokens: 100, inputTokens: 50, outputTokens: 50 },
-    } as Awaited<ReturnType<GenerateTextType>>);
+    } as Awaited<ReturnType<GenerateTextType>>)
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          step_title: { title: "Tailored client workspace" },
+          helper_text: { body: "Highlight the integrations your client relies on." },
+          cta_primary: { label: "Start setup" },
+          callout_info: { body: "We'll surface client guardrails first." },
+          badge_caption: { caption: "AI personalized" },
+        }),
+        usage: { totalTokens: 120, inputTokens: 80, outputTokens: 40 },
+      } as Awaited<ReturnType<GenerateTextType>>);
 
     const POST = await loadRoute();
     const response = await POST(createRequest({ message: "Client rollout with Slack" }));
@@ -89,6 +100,8 @@ describe("POST /api/canvas/plan", () => {
     });
     expect(payload.promptSignals).toBeDefined();
     expect(payload.personalization.fallback).toMatchObject({ applied: true });
+    expect(typeof payload.templateCopy.stepTitle).toBe("string");
+    expect(payload.templateCopy.stepTitle.length).toBeGreaterThan(0);
     expect(payload.personalization.overrides).toHaveProperty("integrationMode");
 
     expect(logCanvasDecision).toHaveBeenCalledWith(
@@ -97,10 +110,21 @@ describe("POST /api/canvas/plan", () => {
   });
 
   it("falls back to heuristics when LLM confidence is low", async () => {
-    generateText.mockResolvedValue({
+    generateText
+      .mockResolvedValueOnce({
       text: '{"persona":"team","recipe_id":"R3","intent_tags":["client"],"confidence":0.4,"reasoning":"Uncertain"}',
       usage: { totalTokens: 40, inputTokens: 20, outputTokens: 20 },
-    } as Awaited<ReturnType<GenerateTextType>>);
+    } as Awaited<ReturnType<GenerateTextType>>)
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          step_title: { title: "Team workspace essentials" },
+          helper_text: { body: "Bring collaborators together." },
+          cta_primary: { label: "Continue" },
+          callout_info: { body: "We'll start with integrations." },
+          badge_caption: { caption: "AI suggested" },
+        }),
+        usage: { totalTokens: 100, inputTokens: 60, outputTokens: 40 },
+      } as Awaited<ReturnType<GenerateTextType>>);
 
     const POST = await loadRoute();
     const response = await POST(createRequest({ message: "Maybe a team space" }));
@@ -119,6 +143,8 @@ describe("POST /api/canvas/plan", () => {
       applied: true,
       reasons: expect.arrayContaining(["insufficient_confidence"]),
     });
+    expect(typeof payload.templateCopy.stepTitle).toBe("string");
+    expect(payload.templateCopy.stepTitle.length).toBeGreaterThan(0);
 
     expect(logCanvasDecision).toHaveBeenCalledWith(
       expect.objectContaining({ decisionSource: "heuristics", recipeId: "R2" })
@@ -126,7 +152,18 @@ describe("POST /api/canvas/plan", () => {
   });
 
   it("uses heuristics when LLM throws", async () => {
-    generateText.mockRejectedValue(new Error("network error"));
+    generateText
+      .mockRejectedValueOnce(new Error("network error"))
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          step_title: { title: "Governance-first configuration" },
+          helper_text: { body: "Enable audit-ready defaults right away." },
+          cta_primary: { label: "Enable controls" },
+          callout_info: { body: "We'll preconfigure compliance guardrails." },
+          badge_caption: { caption: "Policy aligned" },
+        }),
+        usage: { totalTokens: 100, inputTokens: 60, outputTokens: 40 },
+      } as Awaited<ReturnType<GenerateTextType>>);
 
     const POST = await loadRoute();
     const response = await POST(createRequest({ message: "Need approvals and audit logs" }));
@@ -142,6 +179,8 @@ describe("POST /api/canvas/plan", () => {
       decisionSource: "heuristics",
     });
     expect(payload.personalization.fallback.applied).toBe(false);
+    expect(typeof payload.templateCopy.primaryCta).toBe("string");
+    expect(payload.templateCopy.primaryCta.length).toBeGreaterThan(0);
     expect(payload.personalization.overrides.approvalChainLength.value).toBeGreaterThanOrEqual(1);
   });
 
@@ -186,6 +225,7 @@ describe("POST /api/canvas/plan", () => {
       applied: true,
       reasons: expect.arrayContaining(["insufficient_confidence"]),
     });
+    expect(payload.templateCopy.stepTitle.length).toBeGreaterThan(0);
     expect(generateText).not.toHaveBeenCalled();
   });
 });

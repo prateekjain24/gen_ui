@@ -6,6 +6,9 @@ import { classifyByHeuristics } from "@/lib/canvas/heuristics";
 import { CANVAS_CLASSIFIER_SYSTEM_PROMPT, buildCanvasClassifierPrompt } from "@/lib/canvas/prompt";
 import type { CanvasRecipeId } from "@/lib/canvas/recipes";
 import { getRecipe } from "@/lib/canvas/recipes";
+import { renderTemplateCopy, type RenderedTemplate } from "@/lib/canvas/template-fill";
+import type { SlotValidationIssue } from "@/lib/canvas/template-validator";
+import type { TemplateId } from "@/lib/canvas/templates";
 import { LLM_CONFIG } from "@/lib/constants";
 import {
   getOpenAIProvider,
@@ -110,9 +113,22 @@ type CanvasDecisionResponse = {
   decisionSource: "llm" | "heuristics";
   promptSignals: PromptSignals;
   personalization: RecipePersonalizationResult;
+  templateCopy: TemplateCopyPayload;
 };
 
-type CanvasDecisionResponseBase = Omit<CanvasDecisionResponse, "promptSignals" | "personalization">;
+interface TemplateCopyPayload {
+  stepTitle: string;
+  helperText: string;
+  primaryCta: string;
+  callout: {
+    heading?: string;
+    body: string;
+  };
+  badgeCaption: string;
+  issues: SlotValidationIssue[];
+}
+
+type CanvasDecisionResponseBase = Omit<CanvasDecisionResponse, "promptSignals" | "personalization" | "templateCopy">;
 
 const sanitizeReasoning = (value: string): string => {
   const trimmed = value.trim();
@@ -396,10 +412,27 @@ export async function POST(req: NextRequest) {
 
     const promptSignals = await buildPromptSignals(message);
     const personalization = scoreRecipeKnobs(responsePayload.recipeId, promptSignals);
+
+    const templateFill = await renderTemplateCopy({
+      recipeId: responsePayload.recipeId,
+      persona: responsePayload.persona,
+      signals: promptSignals,
+      knobOverrides: personalization.overrides,
+      requests: [
+        { templateId: "step_title" },
+        { templateId: "helper_text" },
+        { templateId: "cta_primary" },
+        { templateId: "callout_info" },
+        { templateId: "badge_caption" },
+      ],
+    });
+
+    const templateCopy = buildTemplatePayload(templateFill.templates);
     const responsePayloadWithSignals: CanvasDecisionResponse = {
       ...responsePayload,
       promptSignals,
       personalization,
+      templateCopy,
     };
 
     if (sessionId) {
@@ -434,6 +467,7 @@ export async function POST(req: NextRequest) {
       llmRawResponse: rawLlmResponse,
       rawDecision: llmResult?.decision ?? null,
       personalizationFallback: personalization.fallback,
+      templateTelemetry: templateFill.telemetry,
     });
 
     return NextResponse.json(responsePayloadWithSignals);
@@ -445,3 +479,33 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+const buildTemplatePayload = (templates: RenderedTemplate[]): TemplateCopyPayload => {
+  const map = new Map<TemplateId, RenderedTemplate>();
+  templates.forEach(template => {
+    map.set(template.templateId, template);
+  });
+
+  const stepTitle = map.get("step_title");
+  const helper = map.get("helper_text");
+  const cta = map.get("cta_primary");
+  const callout = map.get("callout_info");
+  const badge = map.get("badge_caption");
+
+  const aggregatedIssues: SlotValidationIssue[] = [];
+  templates.forEach(template => {
+    aggregatedIssues.push(...template.issues);
+  });
+
+  return {
+    stepTitle: stepTitle?.values.title ?? "Workspace setup",
+    helperText: helper?.values.body ?? "Keep it lightweight so you can dive in immediately.",
+    primaryCta: cta?.values.label ?? "Continue",
+    callout: {
+      heading: callout?.values.heading,
+      body: callout?.values.body ?? "We'll start simple. You can add more later.",
+    },
+    badgeCaption: badge?.values.caption ?? "AI recommended",
+    issues: aggregatedIssues,
+  };
+};

@@ -12,6 +12,7 @@ import { useStaggeredMount } from "@/hooks/useStaggeredMount";
 import { canvasCopy } from "@/lib/canvas/copy";
 import type { CanvasRecipe, CanvasRecipeId } from "@/lib/canvas/recipes";
 import { getRecipe } from "@/lib/canvas/recipes";
+import type { SlotValidationIssue } from "@/lib/canvas/template-validator";
 import { ENV } from "@/lib/constants";
 import type { RecipePersonalizationResult } from "@/lib/personalization/scoring";
 import type { PromptSignals } from "@/lib/prompt-intel/types";
@@ -30,6 +31,19 @@ interface CanvasPlanResponse {
   decisionSource: CanvasDecisionSource;
   promptSignals: PromptSignals;
   personalization: RecipePersonalizationResult;
+  templateCopy: TemplateCopyPayload;
+}
+
+interface TemplateCopyPayload {
+  stepTitle: string;
+  helperText: string;
+  primaryCta: string;
+  callout: {
+    heading?: string;
+    body: string;
+  };
+  badgeCaption: string;
+  issues: SlotValidationIssue[];
 }
 
 interface CanvasPlanState extends CanvasPlanResponse {
@@ -94,14 +108,33 @@ const buildFormPlan = (recipe: CanvasRecipe, response: CanvasPlanResponse): Form
     },
   ];
 
+  const fields = recipe.fields.map(field => {
+    if (field.kind === "callout") {
+      return {
+        ...field,
+        label: response.templateCopy.callout.heading ?? field.label,
+        body: response.templateCopy.callout.body ?? field.body,
+      };
+    }
+
+    if (field.kind === "info_badge") {
+      return {
+        ...field,
+        label: response.templateCopy.badgeCaption || field.label,
+      };
+    }
+
+    return field;
+  });
+
   return {
     kind: "render_step",
     step: {
       stepId,
-      title: personaMeta.title,
-      description: personaMeta.description,
-      fields: recipe.fields,
-      primaryCta: { label: "Continue", action: "submit_step" },
+      title: response.templateCopy.stepTitle || personaMeta.title,
+      description: response.templateCopy.helperText || personaMeta.description,
+      fields,
+      primaryCta: { label: response.templateCopy.primaryCta || "Continue", action: "submit_step" },
       secondaryCta: response.persona === "explorer" ? { label: "Skip for now", action: "skip" } : undefined,
     },
     stepper,
@@ -402,6 +435,12 @@ export function CanvasChat(): React.ReactElement {
                   {plan.personalization.fallback.applied ? (
                     <span className="text-xs text-amber-600 dark:text-amber-400">
                       Personalization fallback triggered ({plan.personalization.fallback.reasons.join(", ")}). You can tweak the fields below manually.
+                    </span>
+                  ) : null}
+                  {plan.templateCopy.issues.length ? (
+                    <span className="text-xs text-amber-600 dark:text-amber-400">
+                      Some copy reverted to defaults due to validation: {plan.templateCopy.issues.length} issue
+                      {plan.templateCopy.issues.length === 1 ? "" : "s"} detected.
                     </span>
                   ) : null}
                   {!enableExperimentalComponents ? (

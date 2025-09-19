@@ -2,6 +2,7 @@ import { appendFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { CanvasRecipeId } from '@/lib/canvas/recipes';
+import type { TemplateFillTelemetry } from '@/lib/canvas/template-fill';
 import { EVAL_LOG_CONFIG, LLM_CONFIG, PROMPT_VERSION } from '@/lib/constants';
 import { buildLLMUserContext } from '@/lib/llm/context';
 import type { LLMDecisionMetadata } from '@/lib/llm/response-parser';
@@ -118,6 +119,7 @@ export interface CanvasDecisionLog {
   llmRawResponse?: string | null;
   rawDecision?: unknown;
   personalizationFallback?: PersonalizationFallbackMeta;
+  templateTelemetry?: TemplateFillTelemetry[];
 }
 
 function resolveCanvasLogDir(): string {
