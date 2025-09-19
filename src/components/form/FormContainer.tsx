@@ -3,8 +3,10 @@
 import { Loader2 } from 'lucide-react';
 import * as React from 'react';
 
+import { AIAttributionBadge } from '@/components/canvas/AIAttributionBadge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import type { AIAttribution } from '@/lib/types/ai';
 import type { ButtonAction } from '@/lib/types/form';
 import { cn } from '@/lib/utils';
 import { debugError } from '@/lib/utils/debug';
@@ -22,6 +24,8 @@ interface FormContainerProps {
   isSubmitting?: boolean;
   error?: string | null;
   footerContent?: React.ReactNode;
+  titleAttribution?: AIAttribution;
+  descriptionAttribution?: AIAttribution;
 }
 
 interface FormErrorBoundaryProps {
@@ -91,6 +95,8 @@ export function FormContainer({
   isSubmitting,
   error,
   footerContent,
+  titleAttribution,
+  descriptionAttribution,
 }: FormContainerProps) {
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -110,8 +116,20 @@ export function FormContainer({
       {stepper ? <div className="border-b border-border/60 bg-muted/40 p-6">{stepper}</div> : null}
       <form onSubmit={handleSubmit} noValidate>
         <CardHeader>
-          <CardTitle className="text-balance text-xl sm:text-2xl">{title}</CardTitle>
-          {description ? <CardDescription className="text-sm sm:text-base">{description}</CardDescription> : null}
+          <CardTitle className="text-balance text-xl sm:text-2xl">
+            <span className="flex items-start gap-2">
+              <span className="flex-1 text-left">{title}</span>
+              {titleAttribution ? <AIAttributionBadge attribution={titleAttribution} size="sm" /> : null}
+            </span>
+          </CardTitle>
+          {description ? (
+            <CardDescription className="flex items-start gap-2 text-sm sm:text-base">
+              <span className="flex-1 text-left">{description}</span>
+              {descriptionAttribution ? (
+                <AIAttributionBadge attribution={descriptionAttribution} size="sm" className="mt-0.5" />
+              ) : null}
+            </CardDescription>
+          ) : null}
         </CardHeader>
         <CardContent>
           <FormErrorBoundary>
@@ -128,7 +146,12 @@ export function FormContainer({
                   {primaryAction.label}
                 </span>
               ) : (
-                primaryAction.label
+                <span className="flex items-center gap-2">
+                  {primaryAction.label}
+                  {primaryAction.aiAttribution ? (
+                    <AIAttributionBadge attribution={primaryAction.aiAttribution} size="sm" />
+                  ) : null}
+                </span>
               )}
             </Button>
             {secondaryAction ? (
@@ -139,7 +162,12 @@ export function FormContainer({
                 onClick={handleSecondary}
                 disabled={isSubmitting}
               >
-                {secondaryAction.label}
+                <span className="flex items-center gap-2">
+                  {secondaryAction.label}
+                  {secondaryAction.aiAttribution ? (
+                    <AIAttributionBadge attribution={secondaryAction.aiAttribution} size="sm" />
+                  ) : null}
+                </span>
               </Button>
             ) : null}
           </div>

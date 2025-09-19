@@ -3,6 +3,7 @@
 import { Check, Info, ShieldCheck, Sparkles } from 'lucide-react';
 import * as React from 'react';
 
+import { AIAttributionBadge } from '@/components/canvas/AIAttributionBadge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -39,7 +40,10 @@ export function CalloutBlock({ field }: { field: CalloutField }) {
           <IconComp className="h-4 w-4" />
         </div>
         <div className="space-y-1">
-          <p className="text-sm font-semibold leading-tight text-foreground">{field.label}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold leading-tight text-foreground">{field.label}</p>
+            {field.aiAttribution ? <AIAttributionBadge attribution={field.aiAttribution} size="sm" /> : null}
+          </div>
           <p className="text-sm text-muted-foreground">{field.body}</p>
           {field.helperText ? (
             <p className="text-xs text-muted-foreground/80">{field.helperText}</p>
@@ -61,7 +65,10 @@ export function CalloutBlock({ field }: { field: CalloutField }) {
 export function ChecklistBlock({ field }: { field: ChecklistField }) {
   return (
     <div className="rounded-lg border border-dashed border-border/70 bg-background/60 p-4">
-      <p className="mb-3 text-sm font-semibold text-foreground">{field.label}</p>
+      <div className="mb-3 flex items-center gap-2">
+        <p className="text-sm font-semibold text-foreground">{field.label}</p>
+        {field.aiAttribution ? <AIAttributionBadge attribution={field.aiAttribution} size="sm" /> : null}
+      </div>
       <ul className="space-y-2 text-sm">
         {field.items.map(item => (
           <li key={item.id} className="flex items-start gap-2">
@@ -88,15 +95,18 @@ export function InfoBadgePill({ field }: { field: InfoBadgeField }) {
   }[field.variant ?? 'info'];
 
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide',
-        variantClass
-      )}
-    >
-      {field.icon ? <span className="font-semibold">{field.icon}</span> : null}
-      {field.label}
-    </span>
+    <div className="flex items-center gap-2">
+      <span
+        className={cn(
+          'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide',
+          variantClass
+        )}
+      >
+        {field.icon ? <span className="font-semibold">{field.icon}</span> : null}
+        {field.label}
+      </span>
+      {field.aiAttribution ? <AIAttributionBadge attribution={field.aiAttribution} size="sm" /> : null}
+    </div>
   );
 }
 
@@ -128,8 +138,11 @@ export function IntegrationPickerInput({ field, value, onChange, onFocus, onBlur
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium leading-none text-foreground">{field.label}</p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium leading-none text-foreground">{field.label}</p>
+          {field.aiAttribution ? <AIAttributionBadge attribution={field.aiAttribution} size="sm" /> : null}
+        </div>
         {field.categoryLabel ? (
           <span className="text-xs uppercase tracking-wide text-muted-foreground">{field.categoryLabel}</span>
         ) : null}
@@ -181,7 +194,10 @@ export interface AdminToggleProps {
 export function AdminToggleInput({ field, value, onChange, onFocus, onBlur }: AdminToggleProps) {
   return (
     <div className="space-y-2">
-      <p className="text-sm font-medium leading-none text-foreground">{field.label}</p>
+      <div className="flex items-center gap-2">
+        <p className="text-sm font-medium leading-none text-foreground">{field.label}</p>
+        {field.aiAttribution ? <AIAttributionBadge attribution={field.aiAttribution} size="sm" /> : null}
+      </div>
       {field.helperText ? <p className="text-sm text-muted-foreground">{field.helperText}</p> : null}
       <div className="inline-flex rounded-md border border-border/60 bg-background p-1 text-sm shadow-sm">
         {field.options.map(option => {

@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 
+import { AIAttributionBadge } from '@/components/canvas/AIAttributionBadge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -50,12 +51,18 @@ export function Field({ field, stepId, value, onValueChange, onFocus, onBlur }: 
 
   switch (field.kind) {
     case 'text': {
-      return (
-        <div className="space-y-2">
-          <Label htmlFor={field.id}>
+      const labelContent = (
+        <span className="flex items-center gap-2">
+          <span>
             {field.label}
             {field.required ? <span className="ml-1 text-destructive">*</span> : null}
-          </Label>
+          </span>
+          {field.aiAttribution ? <AIAttributionBadge attribution={field.aiAttribution} size="sm" /> : null}
+        </span>
+      );
+      return (
+        <div className="space-y-2">
+          <Label htmlFor={field.id}>{labelContent}</Label>
           <Input
             id={field.id}
             name={field.id}
@@ -83,12 +90,18 @@ export function Field({ field, stepId, value, onValueChange, onFocus, onBlur }: 
     case 'radio': {
       const orientation = field.orientation ?? 'vertical';
       const currentValue = typeof value === 'string' ? value : field.value;
-      return (
-        <fieldset className="space-y-2">
-          <legend className="text-sm font-medium leading-none">
+      const legendContent = (
+        <span className="flex items-center gap-2">
+          <span>
             {field.label}
             {field.required ? <span className="ml-1 text-destructive">*</span> : null}
-          </legend>
+          </span>
+          {field.aiAttribution ? <AIAttributionBadge attribution={field.aiAttribution} size="sm" /> : null}
+        </span>
+      );
+      return (
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium leading-none">{legendContent}</legend>
           <RadioGroup
             name={field.id}
             value={currentValue}
@@ -135,12 +148,18 @@ export function Field({ field, stepId, value, onValueChange, onFocus, onBlur }: 
         : Array.isArray(field.values)
           ? field.values
           : [];
-      return (
-        <fieldset className="space-y-2">
-          <legend className="text-sm font-medium leading-none">
+      const legendContent = (
+        <span className="flex items-center gap-2">
+          <span>
             {field.label}
             {field.required ? <span className="ml-1 text-destructive">*</span> : null}
-          </legend>
+          </span>
+          {field.aiAttribution ? <AIAttributionBadge attribution={field.aiAttribution} size="sm" /> : null}
+        </span>
+      );
+      return (
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium leading-none">{legendContent}</legend>
           <div className={cn(orientation === 'horizontal' ? 'flex flex-wrap gap-4' : 'space-y-3')}>
             {field.options.map(option => {
               const optionId = `${field.id}-${option.value}`;
@@ -180,12 +199,18 @@ export function Field({ field, stepId, value, onValueChange, onFocus, onBlur }: 
 
     case 'select': {
       const currentValue = typeof value === 'string' ? value : field.value ?? '';
-      return (
-        <div className="space-y-2">
-          <Label htmlFor={field.id}>
+      const labelContent = (
+        <span className="flex items-center gap-2">
+          <span>
             {field.label}
             {field.required ? <span className="ml-1 text-destructive">*</span> : null}
-          </Label>
+          </span>
+          {field.aiAttribution ? <AIAttributionBadge attribution={field.aiAttribution} size="sm" /> : null}
+        </span>
+      );
+      return (
+        <div className="space-y-2">
+          <Label htmlFor={field.id}>{labelContent}</Label>
           <Select
             value={currentValue || undefined}
             onValueChange={selected => onValueChange(selected)}

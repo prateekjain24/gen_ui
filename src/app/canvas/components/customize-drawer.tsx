@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { RecipeKnobOverrides } from "@/lib/personalization/scoring";
+import { formatSignalValue, SIGNAL_LABEL_MAP } from "@/lib/prompt-intel/format";
 import type { PromptSignalSource, PromptSignals } from "@/lib/prompt-intel/types";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +46,12 @@ interface SignalDescriptor {
   confidence: number;
   source: PromptSignalSource;
 }
+
+const isSameKnobState = (a: DrawerKnobState, b: DrawerKnobState): boolean =>
+  a.approvalChainLength === b.approvalChainLength &&
+  a.integrationMode === b.integrationMode &&
+  a.copyTone === b.copyTone &&
+  a.inviteStrategy === b.inviteStrategy;
 
 const DEFAULT_KNOB_STATE: DrawerKnobState = {
   approvalChainLength: 1,
@@ -89,14 +96,6 @@ const SOURCE_LABEL: Record<PromptSignalSource, string> = {
   merge: "Merged",
 };
 
-const LABEL_MAP: Partial<Record<keyof PromptSignals, string>> = {
-  industry: "Industry",
-  copyTone: "Copy tone",
-  approvalChainDepth: "Approval depth",
-  integrationCriticality: "Integration criticality",
-  tools: "Mentioned tools",
-};
-
 const formatKnobState = (overrides?: RecipeKnobOverrides): DrawerKnobState => {
   if (!overrides) {
     return DEFAULT_KNOB_STATE;
@@ -121,31 +120,6 @@ const formatKnobState = (overrides?: RecipeKnobOverrides): DrawerKnobState => {
   return next;
 };
 
-const formatSignalValue = (signal: PromptSignals[keyof PromptSignals]): string => {
-  if (!signal) {
-    return "Not set";
-  }
-  const { value } = signal;
-  if (Array.isArray(value)) {
-    if (value.length === 0) {
-      return "Not set";
-    }
-    if (typeof value[0] === "object" && value[0] !== null) {
-      return `${value.length} decision makers`;
-    }
-    return value.join(", ");
-  }
-
-  if (typeof value === "object" && value !== null) {
-    const parts = ["timeline" in value ? value.timeline : null, "budget" in value ? value.budget : null].filter(
-      Boolean
-    );
-    return parts.length ? parts.join(" • ") : "No constraints";
-  }
-
-  return String(value ?? "Not set");
-};
-
 const mapSignals = (signals?: PromptSignals): SignalDescriptor[] => {
   if (!signals) {
     return [];
@@ -166,7 +140,7 @@ const mapSignals = (signals?: PromptSignals): SignalDescriptor[] => {
     }
     accumulator.push({
       id: String(key),
-      label: LABEL_MAP[key] ?? String(key),
+      label: SIGNAL_LABEL_MAP[key] ?? String(key),
       value: formatSignalValue(signal),
       confidence: signal.metadata.confidence ?? 0,
       source: signal.metadata.source,
@@ -233,6 +207,45 @@ export function CustomizeDrawer({
 }: CustomizeDrawerProps): React.ReactElement | null {
   const drawerRef = React.useRef<HTMLDivElement>(null);
   const [knobState, setKnobState] = React.useState<DrawerKnobState>(() => formatKnobState(knobOverrides));
+  const [history, setHistory] = React.useState<DrawerKnobState[]>([]);
+  const [toast, setToast] = React.useState<{ id: number; message: string } | null>(null);
+
+  const showToast = React.useCallback((message: string) => {
+    setToast({ id: Date.now(), message });
+  }, []);
+
+  React.useEffect(() => {
+    if (!toast) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setToast(current => (current?.id === toast.id ? null : current));
+    }, 3200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  const pushHistory = React.useCallback((state: DrawerKnobState) => {
+    setHistory(current => {
+      if (current.length && isSameKnobState(current[0], state)) {
+        return current;
+      }
+      const next = [state, ...current];
+      return next.slice(0, 5);
+    });
+  }, []);
+
+  const applyKnobState = React.useCallback(
+    (updater: (prev: DrawerKnobState) => DrawerKnobState) => {
+      setKnobState(prev => {
+        const next = updater(prev);
+        if (!isSameKnobState(prev, next)) {
+          pushHistory(prev);
+        }
+        return next;
+      });
+    },
+    [pushHistory]
+  );
   const signals = React.useMemo(() => {
     const mapped = mapSignals(promptSignals);
     return mapped.length ? mapped : FALLBACK_SIGNALS;
@@ -241,8 +254,15 @@ export function CustomizeDrawer({
   React.useEffect(() => {
     if (open) {
       setKnobState(formatKnobState(knobOverrides));
+      setHistory([]);
     }
   }, [open, knobOverrides]);
+
+  React.useEffect(() => {
+    if (!open) {
+      setToast(null);
+    }
+  }, [open]);
 
   React.useEffect(() => {
     if (!open) {
@@ -288,6 +308,29 @@ export function CustomizeDrawer({
     };
   }, [open, onOpenChange]);
 
+  const handleUndo = React.useCallback(() => {
+    setHistory(current => {
+      if (!current.length) {
+        showToast("Nothing to undo");
+        return current;
+      }
+      const [previous, ...rest] = current;
+      setKnobState(previous);
+      showToast("Reverted last change");
+      return rest;
+    });
+  }, [showToast]);
+
+  const handleReset = React.useCallback(() => {
+    if (isSameKnobState(knobState, DEFAULT_KNOB_STATE)) {
+      showToast("Already using baseline settings");
+      return;
+    }
+    setHistory(current => [knobState, ...current].slice(0, 5));
+    setKnobState(DEFAULT_KNOB_STATE);
+    showToast("Reset to baseline settings");
+  }, [knobState, showToast]);
+
   if (!open) {
     return null;
   }
@@ -311,7 +354,7 @@ export function CustomizeDrawer({
         tabIndex={-1}
         className="fixed right-0 top-0 z-50 hidden h-full w-full max-w-xl flex-col border-l border-border bg-background shadow-xl transition-transform lg:flex"
       >
-        <header className="flex items-center justify-between border-b border-border px-6 py-4">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-4">
           <div className="flex items-center gap-3">
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
               <Settings2 className="h-4 w-4" aria-hidden="true" />
@@ -323,15 +366,38 @@ export function CustomizeDrawer({
               <p className="text-sm text-muted-foreground">Adjust signals and knobs to refine the canvas plan.</p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Close customize drawer"
-            onClick={() => onOpenChange(false)}
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!history.length}>
+              Undo
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReset}
+              disabled={isSameKnobState(knobState, DEFAULT_KNOB_STATE)}
+            >
+              Reset to baseline
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Close customize drawer"
+              onClick={() => onOpenChange(false)}
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
         </header>
+
+        {toast ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="mx-6 mt-4 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-xs font-medium text-primary shadow-sm"
+          >
+            {toast.message}
+          </div>
+        ) : null}
 
         <div className="flex flex-1 flex-col gap-8 overflow-y-auto px-6 py-6">
           <section className="space-y-4">
@@ -364,7 +430,7 @@ export function CustomizeDrawer({
                   step={1}
                   value={knobState.approvalChainLength}
                   onChange={event =>
-                    setKnobState(prev => ({ ...prev, approvalChainLength: Number(event.target.value) }))
+                    applyKnobState(prev => ({ ...prev, approvalChainLength: Number(event.target.value) }))
                   }
                   aria-valuemin={0}
                   aria-valuemax={5}
@@ -386,7 +452,7 @@ export function CustomizeDrawer({
               </Label>
               <Select
                 value={knobState.integrationMode}
-                onValueChange={value => setKnobState(prev => ({ ...prev, integrationMode: value }))}
+                onValueChange={value => applyKnobState(prev => ({ ...prev, integrationMode: value }))}
               >
                 <SelectTrigger id="integration-mode">
                   <SelectValue placeholder="Select integration mode" />
@@ -406,7 +472,7 @@ export function CustomizeDrawer({
               <Label htmlFor="copy-tone" className="text-sm font-medium text-foreground">
                 Copy tone
               </Label>
-              <Select value={knobState.copyTone} onValueChange={value => setKnobState(prev => ({ ...prev, copyTone: value }))}>
+              <Select value={knobState.copyTone} onValueChange={value => applyKnobState(prev => ({ ...prev, copyTone: value }))}>
                 <SelectTrigger id="copy-tone">
                   <SelectValue placeholder="Select tone" />
                 </SelectTrigger>
@@ -427,7 +493,7 @@ export function CustomizeDrawer({
                 id="invite-strategy"
                 checked={knobState.inviteStrategy === "staggered"}
                 onCheckedChange={checked =>
-                  setKnobState(prev => ({ ...prev, inviteStrategy: checked ? "staggered" : "immediate" }))
+                  applyKnobState(prev => ({ ...prev, inviteStrategy: checked ? "staggered" : "immediate" }))
                 }
               />
               <div className="space-y-1">

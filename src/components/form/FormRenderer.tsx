@@ -146,6 +146,8 @@ export function FormRenderer({
           description={step.description}
           primaryAction={step.primaryCta}
           secondaryAction={step.secondaryCta}
+          titleAttribution={step.titleAttribution}
+          descriptionAttribution={step.descriptionAttribution}
           onSubmit={(_, action) => handleAction(action.action)}
           onAction={action => handleAction(action)}
           stepper={<Stepper steps={stepper} activeStepId={activeStepId} />}

@@ -1,3 +1,5 @@
+import type { AIAttribution } from './ai';
+
 /**
  * Form Type Definitions
  *
@@ -40,6 +42,8 @@ interface BaseField {
   helperText?: string;
   /** Error message to display when validation fails */
   errorMessage?: string;
+  /** Optional AI attribution metadata attached to the field */
+  aiAttribution?: AIAttribution;
 }
 
 /**
@@ -333,6 +337,8 @@ export interface ButtonAction {
   label: string;
   /** Action to perform when clicked */
   action: 'submit_step' | 'back' | 'skip' | 'complete';
+  /** Optional AI attribution metadata for this action */
+  aiAttribution?: AIAttribution;
 }
 
 /**
@@ -354,8 +360,12 @@ export interface FormStep {
   stepId: string;
   /** Display title for the step */
   title: string;
+  /** Optional attribution metadata for the title */
+  titleAttribution?: AIAttribution;
   /** Optional description or subtitle */
   description?: string;
+  /** Optional attribution metadata for the description */
+  descriptionAttribution?: AIAttribution;
   /** Array of fields to display in this step */
   fields: Field[];
   /** Primary call-to-action button */

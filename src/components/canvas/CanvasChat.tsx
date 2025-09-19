@@ -11,13 +11,16 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useStaggeredMount } from "@/hooks/useStaggeredMount";
 import { canvasCopy } from "@/lib/canvas/copy";
-import type { CanvasRecipe, CanvasRecipeId } from "@/lib/canvas/recipes";
+import type { CanvasRecipe, CanvasRecipeId, RecipeKnobDefinition, RecipeKnobId } from "@/lib/canvas/recipes";
 import { getRecipe } from "@/lib/canvas/recipes";
 import type { SlotValidationIssue } from "@/lib/canvas/template-validator";
 import { ENV } from "@/lib/constants";
-import type { RecipePersonalizationResult } from "@/lib/personalization/scoring";
+import { FIELD_IDS } from "@/lib/constants/fields";
+import type { RecipeKnobOverrides, RecipePersonalizationResult } from "@/lib/personalization/scoring";
+import { formatSignalValue, SIGNAL_LABEL_MAP } from "@/lib/prompt-intel/format";
 import type { PromptSignals } from "@/lib/prompt-intel/types";
 import { createTelemetryQueue, type TelemetryQueue } from "@/lib/telemetry/events";
+import type { AIAttribution, AIAttributionSignal } from "@/lib/types/ai";
 import type { Field, FormPlan, StepperItem } from "@/lib/types/form";
 import { cn } from "@/lib/utils";
 
@@ -97,7 +100,206 @@ const describeField = (field: Field): string => {
   }
 };
 
-const buildFormPlan = (recipe: CanvasRecipe, response: CanvasPlanResponse): FormPlan => {
+const KNOB_TO_FIELD_IDS: Partial<Record<RecipeKnobId, string[]>> = {
+  approvalChainLength: [FIELD_IDS.ADMIN_CONTROLS],
+  integrationMode: [FIELD_IDS.PREFERRED_INTEGRATIONS],
+  inviteStrategy: [FIELD_IDS.TEAM_INVITES],
+  notificationCadence: [FIELD_IDS.GUIDED_CHECKLIST],
+};
+
+const COPY_TONE_FIELD_IDS = [FIELD_IDS.GUIDED_CALLOUT, FIELD_IDS.PERSONA_INFO_BADGE];
+
+const KNOB_SIGNAL_KEYS: Partial<Record<RecipeKnobId, Array<keyof PromptSignals>>> = {
+  approvalChainLength: ["approvalChainDepth", "decisionMakers"],
+  integrationMode: ["integrationCriticality", "tools"],
+  copyTone: ["copyTone", "primaryObjective"],
+  inviteStrategy: ["decisionMakers", "constraints"],
+  notificationCadence: ["constraints"],
+};
+
+const MAX_FALLBACK_DETAILS = 3;
+
+interface AttributionBuildContext {
+  recipe: CanvasRecipe;
+  overrides: RecipeKnobOverrides;
+  fallback: RecipePersonalizationResult["fallback"];
+  promptSignals: PromptSignals;
+  templateIssues: SlotValidationIssue[];
+}
+
+interface PlanAttributionResult {
+  fields: Record<string, AIAttribution>;
+  title?: AIAttribution;
+  description?: AIAttribution;
+  primaryCta?: AIAttribution;
+}
+
+const cloneAttribution = (attribution: AIAttribution): AIAttribution => ({
+  ...attribution,
+  knob: attribution.knob ? { ...attribution.knob } : undefined,
+  signals: attribution.signals.map(signal => ({ ...signal })),
+  fallbackDetails: attribution.fallbackDetails ? [...attribution.fallbackDetails] : undefined,
+});
+
+const buildSignalEntries = (
+  keys: Array<keyof PromptSignals>,
+  signals: PromptSignals
+): AIAttributionSignal[] => {
+  const entries: AIAttributionSignal[] = [];
+  keys.forEach(signalKey => {
+    const signal = signals[signalKey];
+    if (!signal) {
+      return;
+    }
+    entries.push({
+      label: SIGNAL_LABEL_MAP[signalKey] ?? String(signalKey),
+      value: formatSignalValue(signal),
+      confidence: signal.metadata.confidence ?? null,
+    });
+  });
+  return entries;
+};
+
+const formatKnobDisplayValue = (
+  definition: RecipeKnobDefinition | undefined,
+  value: unknown
+): string => {
+  if (value === null || value === undefined) {
+    return "Not set";
+  }
+  if (!definition) {
+    return String(value);
+  }
+  if (definition.type === "enum") {
+    const match = definition.options.find(option => option.value === value);
+    return match?.label ?? String(value);
+  }
+  return String(value);
+};
+
+const buildKnobAttribution = (
+  knobId: RecipeKnobId,
+  context: AttributionBuildContext
+): AIAttribution => {
+  const { recipe, overrides, fallback, promptSignals } = context;
+  const knobDefinition = recipe.knobs?.[knobId];
+  const override = overrides[knobId];
+  const changed = Boolean(override?.changedFromDefault);
+  const fallbackApplied = fallback.applied;
+
+  const defaultValue = knobDefinition?.defaultValue;
+  const overrideValue = override?.value ?? defaultValue;
+
+  const knobValueDisplay = formatKnobDisplayValue(knobDefinition, overrideValue ?? "");
+  const defaultDisplay = formatKnobDisplayValue(knobDefinition, defaultValue ?? "");
+
+  let source: AIAttribution["source"] = changed ? "ai" : "default";
+  let summary = knobDefinition?.description ?? "Using standard template settings.";
+  let rationale: string | undefined = override?.rationale;
+  let fallbackDetails: string[] | undefined;
+
+  if (fallbackApplied) {
+    source = "fallback";
+    summary = fallback.details[0] ?? "Using baseline settings after fallback.";
+    fallbackDetails = fallback.details.slice(0, MAX_FALLBACK_DETAILS);
+    rationale = undefined;
+  }
+
+  const signals = buildSignalEntries(KNOB_SIGNAL_KEYS[knobId] ?? [], promptSignals);
+
+  return {
+    source,
+    summary,
+    rationale,
+    knob: {
+      id: knobId,
+      label: knobDefinition?.label ?? knobId,
+      value: knobValueDisplay,
+      changed,
+      defaultValue: defaultDisplay,
+    },
+    signals,
+    fallbackDetails,
+  };
+};
+
+const humanizeIssueReason = (reason: string): string => reason.replace(/_/g, " ");
+
+const buildTemplateCopyAttribution = (
+  base: AIAttribution,
+  templateIssues: SlotValidationIssue[]
+): AIAttribution => {
+  const attribution = cloneAttribution(base);
+  const hasErrors = templateIssues.some(issue => issue.severity === "error");
+
+  if (hasErrors) {
+    attribution.source = "fallback";
+    attribution.summary = "Using baseline copy after validation issues.";
+    attribution.rationale = undefined;
+    attribution.fallbackDetails = templateIssues
+      .slice(0, MAX_FALLBACK_DETAILS)
+      .map(issue => humanizeIssueReason(issue.reason));
+    return attribution;
+  }
+
+  attribution.source = "ai";
+  attribution.summary = attribution.knob?.changed
+    ? `Personalized copy tone: ${attribution.knob.value}`
+    : `Generated copy using ${attribution.knob?.value ?? 'default'} tone.`;
+  return attribution;
+};
+
+const buildPlanAttributions = (context: AttributionBuildContext): PlanAttributionResult => {
+  const knobAttributions: Partial<Record<RecipeKnobId, AIAttribution>> = {};
+  const knobIds = Object.keys(context.recipe.knobs ?? {}) as RecipeKnobId[];
+  knobIds.forEach(knobId => {
+    knobAttributions[knobId] = buildKnobAttribution(knobId, context);
+  });
+
+  const copyToneBase = knobAttributions.copyTone ?? buildKnobAttribution("copyTone", context);
+  const copyToneAttribution = buildTemplateCopyAttribution(copyToneBase, context.templateIssues);
+
+  const fields: Record<string, AIAttribution> = {};
+
+  COPY_TONE_FIELD_IDS.forEach(fieldId => {
+    if (context.recipe.fields.some(field => field.id === fieldId)) {
+      fields[fieldId] = cloneAttribution(copyToneAttribution);
+    }
+  });
+
+  Object.entries(KNOB_TO_FIELD_IDS).forEach(([key, fieldIds]) => {
+    const knobId = key as RecipeKnobId;
+    const attribution = knobAttributions[knobId];
+    if (!attribution || !fieldIds) {
+      return;
+    }
+    fieldIds.forEach(fieldId => {
+      if (context.recipe.fields.some(field => field.id === fieldId)) {
+        fields[fieldId] = cloneAttribution(attribution);
+      }
+    });
+  });
+
+  return {
+    fields,
+    title: cloneAttribution(copyToneAttribution),
+    description: cloneAttribution(copyToneAttribution),
+    primaryCta: knobAttributions.inviteStrategy
+      ? cloneAttribution(knobAttributions.inviteStrategy)
+      : undefined,
+  };
+};
+
+const buildFormPlan = (
+  recipe: CanvasRecipe,
+  response: CanvasPlanResponse,
+  options: {
+    fields: Field[];
+    titleAttribution?: AIAttribution;
+    descriptionAttribution?: AIAttribution;
+    primaryCtaAttribution?: AIAttribution;
+  }
+): Extract<FormPlan, { kind: "render_step" }> => {
   const personaMeta = personaCopy[response.persona] ?? personaCopy.explorer;
   const stepId = `canvas-${response.recipeId.toLowerCase()}`;
   const stepper: StepperItem[] = [
@@ -109,7 +311,7 @@ const buildFormPlan = (recipe: CanvasRecipe, response: CanvasPlanResponse): Form
     },
   ];
 
-  const fields = recipe.fields.map(field => {
+  const fields = options.fields.map(field => {
     if (field.kind === "callout") {
       return {
         ...field,
@@ -125,7 +327,7 @@ const buildFormPlan = (recipe: CanvasRecipe, response: CanvasPlanResponse): Form
       };
     }
 
-    return field;
+    return { ...field };
   });
 
   return {
@@ -133,9 +335,15 @@ const buildFormPlan = (recipe: CanvasRecipe, response: CanvasPlanResponse): Form
     step: {
       stepId,
       title: response.templateCopy.stepTitle || personaMeta.title,
+       titleAttribution: options.titleAttribution,
       description: response.templateCopy.helperText || personaMeta.description,
+       descriptionAttribution: options.descriptionAttribution,
       fields,
-      primaryCta: { label: response.templateCopy.primaryCta || "Continue", action: "submit_step" },
+      primaryCta: {
+        label: response.templateCopy.primaryCta || "Continue",
+        action: "submit_step",
+        aiAttribution: options.primaryCtaAttribution,
+      },
       secondaryCta: response.persona === "explorer" ? { label: "Skip for now", action: "skip" } : undefined,
     },
     stepper,
@@ -250,10 +458,31 @@ export function CanvasChat(): React.ReactElement {
 
         const data = (await response.json()) as CanvasPlanResponse;
         const recipe = getRecipe(data.recipeId);
+
+        const attributions = buildPlanAttributions({
+          recipe,
+          overrides: data.personalization.overrides,
+          fallback: data.personalization.fallback,
+          promptSignals: data.promptSignals,
+          templateIssues: data.templateCopy.issues,
+        });
+
+        const fieldsWithAttribution = recipe.fields.map(field => {
+          const attribution = attributions.fields[field.id];
+          return attribution ? { ...field, aiAttribution: attribution } : { ...field };
+        });
+
+        const formPlan = buildFormPlan(recipe, data, {
+          fields: fieldsWithAttribution,
+          titleAttribution: attributions.title,
+          descriptionAttribution: attributions.description,
+          primaryCtaAttribution: attributions.primaryCta,
+        });
+
         const nextPlan: CanvasPlanState = {
           ...data,
-          fields: recipe.fields,
-          formPlan: buildFormPlan(recipe, data),
+          fields: formPlan.step.fields,
+          formPlan,
         };
         setPlan(nextPlan);
         setAnimationKey(value => value + 1);
