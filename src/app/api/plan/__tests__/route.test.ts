@@ -95,7 +95,7 @@ describe('POST /api/plan', () => {
     const session = createSession();
     sessionStore.getSession.mockReturnValue(session);
 
-    const plan: FormPlan = {
+  const plan: FormPlan = {
       kind: 'render_step',
       step: {
         stepId: 'basics',
@@ -115,6 +115,7 @@ describe('POST /api/plan', () => {
     await expect(res.json()).resolves.toEqual({
       plan,
       source: 'rules',
+      metadata: null,
     });
 
     expect(sessionStore.getSession).toHaveBeenCalledWith('session-123');
@@ -148,13 +149,20 @@ describe('POST /api/plan', () => {
     };
 
     getNextStepPlan.mockReturnValue(rulesPlan);
-    generatePlanWithLLM.mockResolvedValue(llmPlan);
+    generatePlanWithLLM.mockResolvedValue({
+      plan: llmPlan,
+      metadata: { reasoning: 'Test reasoning', confidence: 0.75, decision: 'progress' },
+    });
 
     const req = createMockRequest({ sessionId: 'session-123', strategy: 'llm' });
 
     const res = await POST(req);
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ plan: llmPlan, source: 'llm' });
+    await expect(res.json()).resolves.toEqual({
+      plan: llmPlan,
+      source: 'llm',
+      metadata: { reasoning: 'Test reasoning', confidence: 0.75, decision: 'progress' },
+    });
   });
 
   it('falls back to rules when strategy is llm but LLM plan is unavailable', async () => {
@@ -179,7 +187,7 @@ describe('POST /api/plan', () => {
 
     const res = await POST(req);
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ plan: rulesPlan, source: 'fallback' });
+    await expect(res.json()).resolves.toEqual({ plan: rulesPlan, source: 'fallback', metadata: null });
   });
 
   it('trims sessionId before lookup', async () => {

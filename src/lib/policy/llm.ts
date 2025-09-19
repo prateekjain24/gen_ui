@@ -13,7 +13,11 @@ import {
 } from '@/lib/llm/client';
 import { buildLLMUserContext, formatLLMUserContext } from '@/lib/llm/context';
 import { enhancePlanWithContext } from '@/lib/llm/field-enhancer';
-import { LLMResponseValidationError, parseLLMDecisionFromText } from '@/lib/llm/response-parser';
+import {
+  LLMResponseValidationError,
+  type LLMDecisionMetadata,
+  parseLLMDecisionFromText,
+} from '@/lib/llm/response-parser';
 import { recordLLMUsage } from '@/lib/llm/usage-tracker';
 import type { FormPlan } from '@/lib/types/form';
 import type { SessionState } from '@/lib/types/session';
@@ -70,7 +74,12 @@ function mapToLLMServiceError(error: unknown): LLMServiceError {
  * Generates a plan using the OpenAI provider via the AI SDK.
  * Currently returns null until schema mapping is implemented in later stories.
  */
-export async function generatePlanWithLLM(session: SessionState): Promise<FormPlan | null> {
+export interface LLMDecisionResult {
+  plan: FormPlan;
+  metadata: LLMDecisionMetadata;
+}
+
+export async function generatePlanWithLLM(session: SessionState): Promise<LLMDecisionResult | null> {
   if (!process.env.OPENAI_API_KEY) {
     debug('Skipping LLM plan generation: OPENAI_API_KEY not configured');
     return null;
@@ -119,7 +128,10 @@ export async function generatePlanWithLLM(session: SessionState): Promise<FormPl
 
     const enhancedPlan = enhancePlanWithContext(parsed.plan, session, parsed.metadata.persona);
 
-    return enhancedPlan;
+    return {
+      plan: enhancedPlan,
+      metadata: parsed.metadata,
+    };
   } catch (error) {
     if (error instanceof LLMResponseValidationError) {
       debugError('LLM response validation failed', error);

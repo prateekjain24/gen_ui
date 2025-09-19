@@ -14,6 +14,12 @@ import type { ButtonAction, FormPlan, StepperItem } from '@/lib/types/form';
 import { cn } from '@/lib/utils';
 
 type FieldValues = Record<string, string | string[]>;
+type LLMPlanMetadata = {
+  reasoning: string;
+  confidence: number;
+  persona?: string;
+  decision?: string;
+};
 
 const FIELD_KEY_SEPARATOR = '::';
 
@@ -67,6 +73,7 @@ export function OnboardingFlow() {
   const [lastPlanFetchedAt, setLastPlanFetchedAt] = React.useState<number | null>(null);
   const [fallbackNotice, setFallbackNotice] = React.useState<string | null>(null);
   const [hasCollectedSignals, setHasCollectedSignals] = React.useState<boolean>(false);
+  const [llmMetadata, setLlmMetadata] = React.useState<LLMPlanMetadata | null>(null);
 
   const requestCounter = React.useRef(0);
   const telemetryRef = React.useRef<TelemetryQueue | null>(null);
@@ -122,7 +129,9 @@ export function OnboardingFlow() {
       try {
         const hasSignals = hasCollectedSignals || planSource === 'llm';
         const desiredStrategy = overrideStrategy ?? (llmStrategy === 'llm' && hasSignals ? 'llm' : 'rules');
-        const { plan: nextPlan, source } = await fetchPlan(currentSessionId, { strategy: desiredStrategy });
+        const { plan: nextPlan, source, metadata } = await fetchPlan(currentSessionId, {
+          strategy: desiredStrategy,
+        });
 
         if (requestCounter.current === requestId) {
           setPlan(nextPlan);
@@ -130,9 +139,11 @@ export function OnboardingFlow() {
           setLastPlanFetchedAt(Date.now());
           if (source === 'fallback') {
             setFallbackNotice('AI temporarily unavailable – continuing with rules-based plan.');
+            setLlmMetadata(null);
           } else {
             setFallbackNotice(null);
             setError(null);
+            setLlmMetadata(metadata ?? null);
           }
           if (source === 'llm') {
             setHasCollectedSignals(true);
@@ -175,6 +186,7 @@ export function OnboardingFlow() {
     (next: 'llm' | 'rules') => {
       setLlmStrategy(next);
       setFallbackNotice(null);
+      setLlmMetadata(null);
       if (typeof window !== 'undefined') {
         window.sessionStorage.setItem(LLM_STRATEGY_STORAGE_KEY, next);
       }
@@ -544,6 +556,7 @@ export function OnboardingFlow() {
           llmStrategy={llmStrategy}
           onStrategyChange={handleStrategyChange}
           fallbackNotice={fallbackNotice}
+          llmMetadata={llmMetadata}
         />
       ) : null}
     </div>

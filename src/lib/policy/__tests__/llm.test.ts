@@ -158,14 +158,15 @@ describe('generatePlanWithLLM', () => {
 
     const result = await generatePlanWithLLM(baseSession());
 
-    expect(result?.kind).toBe('render_step');
-    if (!result || result.kind !== 'render_step') {
+    expect(result?.plan.kind).toBe('render_step');
+    if (!result || result.plan.kind !== 'render_step') {
       throw new Error('Expected render_step result');
     }
-    expect(result.step.fields[0]).toMatchObject({
+    expect(result.plan.step.fields[0]).toMatchObject({
       id: 'workspace_name',
       value: 'Existing Workspace',
     });
+    expect(result.metadata).toMatchObject({ reasoning: 'test', confidence: 0.8 });
     expect(clientMocks.getOpenAIProvider).toHaveBeenCalledTimes(1);
     expect(provider).toHaveBeenCalledWith('gpt-5-mini-test');
     expect(generateTextMock).toHaveBeenCalledTimes(1);

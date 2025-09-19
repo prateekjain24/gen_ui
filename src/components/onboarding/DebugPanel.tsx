@@ -17,6 +17,12 @@ interface DebugPanelProps {
   readonly llmStrategy: 'llm' | 'rules';
   readonly onStrategyChange?: (strategy: 'llm' | 'rules') => void;
   readonly fallbackNotice?: string | null;
+  readonly llmMetadata?: {
+    reasoning: string;
+    confidence: number;
+    persona?: string;
+    decision?: string;
+  } | null;
 }
 
 function formatTimestamp(timestamp: number | null): string {
@@ -114,6 +120,7 @@ export function DebugPanel({
   llmStrategy,
   onStrategyChange,
   fallbackNotice,
+  llmMetadata,
 }: DebugPanelProps) {
   const planSummary = React.useMemo(() => getPlanSummary(plan), [plan]);
   const prettyPlan = React.useMemo(() => (plan ? JSON.stringify(plan, null, 2) : 'No plan loaded yet.'), [plan]);
@@ -141,6 +148,8 @@ export function DebugPanel({
           <DebugRow label="Status" value={isLoading ? 'Fetching plan…' : isSubmitting ? 'Submitting data…' : 'Idle'} />
           <DebugRow label="Error" value={error ?? 'None'} />
           <DebugRow label="Fallback" value={fallbackNotice ?? 'None'} />
+          <DebugRow label="LLM Confidence" value={llmMetadata ? `${Math.round(llmMetadata.confidence * 100)}%` : '—'} />
+          <DebugRow label="LLM Decision" value={llmMetadata?.decision ?? '—'} />
         </div>
         <div className="flex flex-col gap-2 rounded-md border border-border/60 bg-background/70 p-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm">
@@ -164,6 +173,15 @@ export function DebugPanel({
             <DebugRow key={item.label} label={item.label} value={item.value} />
           ))}
         </div>
+        {llmMetadata?.reasoning ? (
+          <div className="rounded-md border border-border/60 bg-background/70 p-3 text-sm">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">LLM Reasoning</div>
+            <p className="mt-1 whitespace-pre-wrap text-foreground">{llmMetadata.reasoning}</p>
+            {llmMetadata.persona ? (
+              <p className="mt-2 text-xs text-muted-foreground">Persona hint: {llmMetadata.persona}</p>
+            ) : null}
+          </div>
+        ) : null}
         <details className="rounded-md border border-border/60 bg-background/80">
           <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Plan payload

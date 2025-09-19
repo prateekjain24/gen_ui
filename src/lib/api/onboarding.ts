@@ -3,9 +3,17 @@ import type { SessionState } from '@/lib/types/session';
 
 type PlanStrategy = 'auto' | 'llm' | 'rules';
 
+export interface LLMPlanMetadata {
+  reasoning: string;
+  confidence: number;
+  persona?: string;
+  decision?: string;
+}
+
 interface PlanResponse {
   plan: FormPlan;
   source: string;
+  metadata?: LLMPlanMetadata | null;
 }
 
 interface CreateSessionResponse {

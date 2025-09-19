@@ -46,7 +46,7 @@ describe('lib/api/onboarding', () => {
   });
 
   it('fetches plan with session id', async () => {
-    const mockPlan = { plan: { kind: 'success', message: 'done' }, source: 'rules' };
+    const mockPlan = { plan: { kind: 'success', message: 'done' }, source: 'rules', metadata: null };
 
     fetchMock.mockResolvedValueOnce(
       new Response(JSON.stringify(mockPlan), {
@@ -64,7 +64,11 @@ describe('lib/api/onboarding', () => {
   });
 
   it('allows passing a strategy when fetching plan', async () => {
-    const mockPlan = { plan: { kind: 'success', message: 'done' }, source: 'rules' };
+    const mockPlan = {
+      plan: { kind: 'success', message: 'done' },
+      source: 'llm',
+      metadata: { reasoning: 'test', confidence: 0.8 },
+    };
 
     fetchMock.mockResolvedValueOnce(
       new Response(JSON.stringify(mockPlan), {
@@ -73,7 +77,8 @@ describe('lib/api/onboarding', () => {
       })
     );
 
-    await fetchPlan('session-123', { strategy: 'llm' });
+    const result = await fetchPlan('session-123', { strategy: 'llm' });
+    expect(result).toEqual(mockPlan);
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/plan',
       expect.objectContaining({ body: JSON.stringify({ sessionId: 'session-123', strategy: 'llm' }) })

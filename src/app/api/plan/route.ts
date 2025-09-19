@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
 
     let finalPlan = rulesPlan;
     let source: DecisionSource = DECISION_SOURCES.RULES;
+    let metadata: Record<string, unknown> | null = null;
 
     const hasSignals =
       session.events.length > 0 ||
@@ -80,10 +81,11 @@ export async function POST(req: NextRequest) {
     const allowLLM = (forcedLLM || (strategy === 'auto' && shouldUseLLM(session.id))) && hasSignals;
 
     if (allowLLM) {
-      const llmPlan = await generatePlanWithLLM(session);
-      if (llmPlan) {
-        finalPlan = llmPlan;
+      const llmDecision = await generatePlanWithLLM(session);
+      if (llmDecision) {
+        finalPlan = llmDecision.plan;
         source = DECISION_SOURCES.LLM;
+        metadata = llmDecision.metadata;
       } else if (forcedLLM) {
         source = DECISION_SOURCES.FALLBACK;
       }
@@ -96,6 +98,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       plan: finalPlan,
       source,
+      metadata,
     });
   } catch (error) {
     console.error('Error generating plan:', error);
