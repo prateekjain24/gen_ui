@@ -1,8 +1,9 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, Settings2 } from "lucide-react";
 import * as React from "react";
 
+import { CustomizeDrawer } from "@/app/canvas/components/customize-drawer";
 import { PersonaBadge, PromptSignalsDebugPanel, ReasoningChip } from "@/components/canvas";
 import { FormRenderer } from "@/components/form/FormRenderer";
 import { Button } from "@/components/ui/button";
@@ -148,6 +149,7 @@ export function CanvasChat(): React.ReactElement {
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [animationKey, setAnimationKey] = React.useState(0);
+  const [isCustomizeOpen, setCustomizeOpen] = React.useState(false);
   const telemetryQueueRef = React.useRef<TelemetryQueue | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -301,6 +303,10 @@ export function CanvasChat(): React.ReactElement {
     }));
   }, [plan]);
 
+  React.useEffect(() => {
+    setCustomizeOpen(false);
+  }, [plan?.recipeId]);
+
   const { getAnimationStyle, motionEnabled } = useStaggeredMount(previewItems.length, {
     intervalMs: 65,
     key: [plan?.recipeId ?? "", animationKey],
@@ -451,6 +457,25 @@ export function CanvasChat(): React.ReactElement {
                 </div>
               </div>
 
+              <div className="hidden items-center justify-end gap-3 lg:flex">
+                <span className="text-xs text-muted-foreground">
+                  Fine-tune copy, approvals, and invites for this plan.
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCustomizeOpen(true)}
+                  aria-haspopup="dialog"
+                  aria-expanded={isCustomizeOpen}
+                  disabled={!plan}
+                  className="inline-flex items-center gap-2"
+                >
+                  <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  Customize
+                </Button>
+              </div>
+
               {previewItems.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2">
                   {previewItems.map((item, index) => (
@@ -483,6 +508,13 @@ export function CanvasChat(): React.ReactElement {
           ) : null}
         </section>
       </div>
+      <CustomizeDrawer
+        open={isCustomizeOpen}
+        onOpenChange={setCustomizeOpen}
+        promptSignals={plan?.promptSignals}
+        knobOverrides={plan?.personalization.overrides}
+        previewCopy={plan?.templateCopy}
+      />
     </main>
   );
 }

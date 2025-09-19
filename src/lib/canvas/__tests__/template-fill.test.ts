@@ -2,6 +2,8 @@ import type { CanvasPersona } from "@/lib/canvas/recipes";
 import { renderTemplateCopy } from "@/lib/canvas/template-fill";
 import { TEMPLATE_CATALOG } from "@/lib/canvas/templates";
 import type { RecipeKnobOverrides } from "@/lib/personalization/scoring";
+import { templateCompletionCache } from "@/lib/prompt-intel/template-cache";
+import type { TemplateCacheKeyInput } from "@/lib/prompt-intel/template-cache";
 import type { PromptSignals } from "@/lib/prompt-intel/types";
 
 jest.mock("@/lib/llm/client", () => ({
@@ -16,9 +18,14 @@ jest.mock("@/lib/llm/client", () => ({
   shouldRetryOnError: jest.fn(() => false),
 }));
 
-const { retryWithExponentialBackoff } = jest.requireMock("@/lib/llm/client") as {
+const llmClientMock = jest.requireMock("@/lib/llm/client") as {
+  getOpenAIProvider: jest.Mock;
+  invokeWithTimeout: jest.Mock;
   retryWithExponentialBackoff: jest.Mock;
+  shouldRetryOnError: jest.Mock;
 };
+
+const { retryWithExponentialBackoff } = llmClientMock;
 
 const baseSignals: PromptSignals = {
   teamSizeBracket: { value: "10-24", metadata: { source: "merge", confidence: 0.6 } },
@@ -42,19 +49,41 @@ const baseKnobs: RecipeKnobOverrides = {
   notificationCadence: { value: "daily", rationale: "", changedFromDefault: true },
 };
 
+const cloneKnobOverrides = (): RecipeKnobOverrides =>
+  Object.fromEntries(Object.entries(baseKnobs).map(([key, value]) => [key, { ...value }])) as RecipeKnobOverrides;
+
+const createCacheKeyInput = (overrides: Partial<TemplateCacheKeyInput> = {}): TemplateCacheKeyInput => ({
+  templateId: "step_title" as TemplateCacheKeyInput["templateId"],
+  persona: "team" as TemplateCacheKeyInput["persona"],
+  industry: baseSignals.industry.value,
+  knobOverrides: cloneKnobOverrides(),
+  signals: { ...baseSignals },
+  ...overrides,
+});
+
 describe("renderTemplateCopy", () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    llmClientMock.getOpenAIProvider.mockImplementation(() => (model: string) => model);
+    llmClientMock.invokeWithTimeout.mockImplementation(
+      (_timeout: number, operation: (signal: AbortSignal) => Promise<unknown>) =>
+        operation(new AbortController().signal)
+    );
+    llmClientMock.retryWithExponentialBackoff.mockImplementation(
+      async (operation: (attempt: number) => Promise<unknown>) => operation(1)
+    );
+    llmClientMock.shouldRetryOnError.mockImplementation(() => false);
     process.env.OPENAI_API_KEY = "test-key";
+    templateCompletionCache.clear();
   });
 
   it("returns validated copy from LLM response", async () => {
-    retryWithExponentialBackoff.mockResolvedValueOnce({
+    retryWithExponentialBackoff.mockImplementationOnce(async () => ({
       text: JSON.stringify({
         step_title: { title: "Open collaboration hub" },
         helper_text: { body: "Bring teammates together with Jira and Slack." },
       }),
-    });
+    }));
 
     const result = await renderTemplateCopy({
       recipeId: "R2",
@@ -66,7 +95,6 @@ describe("renderTemplateCopy", () => {
         { templateId: "helper_text" },
       ],
     });
-
     expect(result.templates).toHaveLength(2);
     const stepTitle = result.templates.find(item => item.templateId === "step_title");
     expect(stepTitle?.values.title).toBe("Open collaboration hub");
@@ -74,10 +102,11 @@ describe("renderTemplateCopy", () => {
     const helper = result.templates.find(item => item.templateId === "helper_text");
     expect(helper?.values.body).toContain("Bring teammates together");
     expect(result.telemetry[0].hashedValues).toBeDefined();
+    expect(result.telemetry[0].cacheStatus).toBe("miss");
   });
 
   it("falls back to defaults when LLM returns invalid JSON", async () => {
-    retryWithExponentialBackoff.mockResolvedValueOnce({ text: "not-json" });
+    retryWithExponentialBackoff.mockImplementationOnce(async () => ({ text: "not-json" }));
 
     const template = TEMPLATE_CATALOG.step_title;
     const result = await renderTemplateCopy({
@@ -91,6 +120,7 @@ describe("renderTemplateCopy", () => {
     expect(result.templates[0].values.title).toBe(template.slots[0].fallback);
     expect(result.templates[0].fallbackApplied).toBe(true);
     expect(result.templates[0].issues.some(issue => issue.reason.includes("invalid_template_json"))).toBe(true);
+    expect(result.telemetry[0].cacheStatus).toBe("miss");
   });
 
   it("skips slots that already have values when partial is true", async () => {
@@ -115,5 +145,45 @@ describe("renderTemplateCopy", () => {
 
     expect(retryWithExponentialBackoff).not.toHaveBeenCalled();
     expect(result.templates[0].values.body).toBe("Existing helper");
+    expect(result.telemetry[0].cacheStatus).toBe("skip");
+  });
+
+  it("uses cached completions when available", async () => {
+    const cacheKey = createCacheKeyInput();
+    templateCompletionCache.set(cacheKey, { title: "Cached automation plan" });
+
+    const result = await renderTemplateCopy({
+      recipeId: "R2",
+      persona: "team" as CanvasPersona,
+      signals: baseSignals,
+      knobOverrides: baseKnobs,
+      requests: [{ templateId: "step_title" }],
+    });
+
+    expect(retryWithExponentialBackoff).not.toHaveBeenCalled();
+    expect(result.templates[0].values.title).toBe("Cached automation plan");
+    expect(result.telemetry[0].cacheStatus).toBe("hit");
+  });
+
+  it("caches validated completions after an LLM miss", async () => {
+    retryWithExponentialBackoff.mockImplementationOnce(async () => ({
+      text: JSON.stringify({
+        step_title: { title: "Confidence driven workspace" },
+      }),
+    }));
+
+    const result = await renderTemplateCopy({
+      recipeId: "R2",
+      persona: "team" as CanvasPersona,
+      signals: baseSignals,
+      knobOverrides: baseKnobs,
+      requests: [{ templateId: "step_title" }],
+    });
+
+    expect(result.templates[0].values.title).toBe("Confidence driven workspace");
+    expect(result.telemetry[0].cacheStatus).toBe("miss");
+
+    const cacheKey = createCacheKeyInput();
+    expect(templateCompletionCache.get(cacheKey)).toEqual({ title: "Confidence driven workspace" });
   });
 });

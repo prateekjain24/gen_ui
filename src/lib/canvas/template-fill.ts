@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { generateText } from "ai";
 
 import type { CanvasPersona, CanvasRecipeId } from "@/lib/canvas/recipes";
-import { validateTemplateSlots, type SlotValidationIssue, type SlotValidationResult } from "@/lib/canvas/template-validator";
+import { validateTemplateSlots, type SlotValidationIssue } from "@/lib/canvas/template-validator";
 import { TEMPLATE_CATALOG, TEMPLATE_IDS, type Template, type TemplateId } from "@/lib/canvas/templates";
 import { LLM_CONFIG } from "@/lib/constants";
 import {
@@ -14,6 +14,11 @@ import {
   type BackoffSettings,
 } from "@/lib/llm/client";
 import type { RecipeKnobOverrides } from "@/lib/personalization/scoring";
+import {
+  templateCompletionCache,
+  type TemplateCacheKeyInput,
+  type TemplateCacheStatus,
+} from "@/lib/prompt-intel/template-cache";
 import type { PromptSignals } from "@/lib/prompt-intel/types";
 import { createDebugger, debugError } from "@/lib/utils/debug";
 
@@ -56,6 +61,7 @@ export interface TemplateFillTelemetry {
   hashedValues: Record<string, string>;
   issues: SlotValidationIssue[];
   fallbackApplied: boolean;
+  cacheStatus: TemplateCacheStatus;
 }
 
 export interface TemplateFillResult {
@@ -91,101 +97,171 @@ export const renderTemplateCopy = async (context: TemplateFillContext): Promise<
   const baseSanitized: RenderedTemplate[] = [];
   const telemetry: TemplateFillTelemetry[] = [];
 
-  const pendingTemplates = allTemplates.filter(({ request, template }) =>
-    shouldRequestSlots(template, request)
-  );
+  const cacheStatuses = new Map<TemplateId, TemplateCacheStatus>();
+  const shouldRequestMap = new Map<TemplateId, boolean>();
 
-  if (!openaiApiKey || pendingTemplates.length === 0) {
-    for (const { template, request } of allTemplates) {
-      const mergedValues = request.existingValues ?? {};
-      const validation = validateTemplateSlots(template.id, mergedValues, { allowPartial: true });
-      baseSanitized.push({
-        templateId: template.id,
-        values: validation.sanitizedValues,
-        issues: validation.issues,
-        fallbackApplied: validation.fallbackApplied,
-      });
-      telemetry.push(buildTelemetry(template.id, validation));
+  const pendingTemplates = allTemplates.filter(({ request, template }) => {
+    const shouldRequest = shouldRequestSlots(template, request);
+    shouldRequestMap.set(template.id, shouldRequest);
+    if (!shouldRequest) {
+      cacheStatuses.set(template.id, "skip");
     }
-    return { templates: baseSanitized, telemetry, rawResponse: null };
+    return shouldRequest;
+  });
+
+  const cacheKeyBase = {
+    persona: context.persona,
+    industry: context.signals.industry.value,
+    knobOverrides: context.knobOverrides,
+    signals: context.signals,
+  } satisfies Omit<TemplateCacheKeyInput, "templateId">;
+
+  const cacheKeyInputs = new Map<TemplateId, TemplateCacheKeyInput>();
+  const generatedByTemplate = new Map<TemplateId, Record<string, string>>();
+  const templatesForLLM: Array<{
+    template: Template;
+    request: TemplateFillRequest;
+    cacheKey: TemplateCacheKeyInput;
+  }> = [];
+
+  for (const pending of pendingTemplates) {
+    const cacheKey: TemplateCacheKeyInput = {
+      ...cacheKeyBase,
+      templateId: pending.template.id,
+    };
+    cacheKeyInputs.set(pending.template.id, cacheKey);
+
+    const cachedValues = templateCompletionCache.get(cacheKey);
+    if (cachedValues) {
+      generatedByTemplate.set(pending.template.id, cachedValues);
+      cacheStatuses.set(pending.template.id, "hit");
+      continue;
+    }
+
+    templatesForLLM.push({ ...pending, cacheKey });
+    if (!cacheStatuses.has(pending.template.id)) {
+      cacheStatuses.set(pending.template.id, "miss");
+    }
   }
 
-  const prompt = buildTemplatePrompt(context, pendingTemplates);
-  const openai = getOpenAIProvider();
+  const shouldInvokeLLM = Boolean(openaiApiKey) && templatesForLLM.length > 0;
+  const openai = shouldInvokeLLM ? getOpenAIProvider() : null;
 
   let rawResponse: string | null = null;
+  let parseFailed = false;
+  let llmFailed = false;
 
-  try {
-    const result = await retryWithExponentialBackoff(
-      attempt =>
-        invokeWithTimeout(TEMPLATE_TIMEOUT_MS, async signal => {
-          const output = await generateText({
-            model: openai(LLM_CONFIG.model),
-            system: TEMPLATE_SYSTEM_PROMPT,
-            prompt,
-            maxOutputTokens: Math.min(1200, LLM_CONFIG.maxTokens),
-            temperature: 0.2,
-            topP: 0.9,
-            presencePenalty: 0,
-            frequencyPenalty: 0,
-            abortSignal: signal,
-            maxRetries: 0,
-          });
-          debug("Template fill success (attempt %d)", attempt);
-          return output;
-        }),
-      TEMPLATE_RETRY,
-      {
-        shouldRetry: error => shouldRetryOnError(error),
-        onRetry: (error, attempt, delayMs) => {
-          debugError(`Template fill attempt ${attempt} failed; retrying in ${delayMs}ms`, error);
-        },
-      }
+  if (shouldInvokeLLM && openai) {
+    const prompt = buildTemplatePrompt(
+      context,
+      templatesForLLM.map(({ template, request }) => ({ template, request }))
     );
 
-    rawResponse = result.text ?? null;
-    const parsed = parseTemplateResponse(rawResponse);
+    try {
+      const result = await retryWithExponentialBackoff(
+        attempt =>
+          invokeWithTimeout(TEMPLATE_TIMEOUT_MS, async signal => {
+            const output = await generateText({
+              model: openai(LLM_CONFIG.model),
+              system: TEMPLATE_SYSTEM_PROMPT,
+              prompt,
+              maxOutputTokens: Math.min(1200, LLM_CONFIG.maxTokens),
+              temperature: 0.2,
+              topP: 0.9,
+              presencePenalty: 0,
+              frequencyPenalty: 0,
+              abortSignal: signal,
+              maxRetries: 0,
+            });
+            debug("Template fill success (attempt %d)", attempt);
+            return output;
+          }),
+        TEMPLATE_RETRY,
+        {
+          shouldRetry: error => shouldRetryOnError(error),
+          onRetry: (error, attempt, delayMs) => {
+            debugError(`Template fill attempt ${attempt} failed; retrying in ${delayMs}ms`, error);
+          },
+        }
+      );
 
-    const parseFailed = !parsed && Boolean(rawResponse);
+      rawResponse = result.text ?? null;
+      const parsed = parseTemplateResponse(rawResponse);
+      parseFailed = !parsed && Boolean(rawResponse);
 
-    for (const { template, request } of allTemplates) {
-      const generatedValues = parsed?.[template.id] ?? {};
-      const mergedValues = {
-        ...(request.existingValues ?? {}),
-        ...generatedValues,
-      };
-      const validation = validateTemplateSlots(template.id, mergedValues, {
-        allowPartial: Boolean(request.partial),
-      });
-      const combinedIssues = parseFailed
-        ? [
-            ...validation.issues,
-            { slotId: "*", reason: "invalid_template_json", severity: "error" } as SlotValidationIssue,
-          ]
-        : validation.issues;
-      baseSanitized.push({
-        templateId: template.id,
-        values: validation.sanitizedValues,
-        issues: combinedIssues,
-        fallbackApplied: validation.fallbackApplied || parseFailed,
-      });
-      telemetry.push(buildTelemetry(template.id, validation));
+      for (const { template } of templatesForLLM) {
+        const generatedValues = parsed?.[template.id] ?? {};
+        generatedByTemplate.set(template.id, generatedValues);
+      }
+    } catch (error) {
+      llmFailed = true;
+      debugError("Template fill failed – falling back to defaults", error);
     }
-  } catch (error) {
-    debugError("Template fill failed – falling back to defaults", error);
-    for (const { template, request } of allTemplates) {
-      const mergedValues = request.existingValues ?? {};
-      const validation = validateTemplateSlots(template.id, mergedValues, { allowPartial: true });
-      baseSanitized.push({
-        templateId: template.id,
-        values: validation.sanitizedValues,
-        issues: [
-          ...validation.issues,
-          { slotId: "*", reason: "llm_error", severity: "error" },
-        ],
-        fallbackApplied: true,
-      });
-      telemetry.push(buildTelemetry(template.id, validation));
+  }
+
+  const relaxedValidation = !shouldInvokeLLM || llmFailed;
+
+  for (const { template, request } of allTemplates) {
+    const shouldRequest = shouldRequestMap.get(template.id) ?? false;
+    const generatedValues = generatedByTemplate.get(template.id) ?? {};
+    const mergedValues = {
+      ...(request.existingValues ?? {}),
+      ...generatedValues,
+    };
+    const validation = validateTemplateSlots(template.id, mergedValues, {
+      allowPartial: shouldRequest ? (!relaxedValidation && !parseFailed ? Boolean(request.partial) : true) : true,
+    });
+
+    let issues = validation.issues;
+    let fallbackApplied = validation.fallbackApplied;
+
+    if (parseFailed) {
+      issues = [
+        ...issues,
+        { slotId: "*", reason: "invalid_template_json", severity: "error" } as SlotValidationIssue,
+      ];
+      fallbackApplied = true;
+    }
+
+    if (llmFailed) {
+      issues = [
+        ...issues,
+        { slotId: "*", reason: "llm_error", severity: "error" },
+      ];
+      fallbackApplied = true;
+    }
+
+    const cacheStatus = cacheStatuses.get(template.id) ?? "skip";
+
+    baseSanitized.push({
+      templateId: template.id,
+      values: validation.sanitizedValues,
+      issues,
+      fallbackApplied,
+    });
+
+    telemetry.push(
+      buildTelemetry(
+        template.id,
+        {
+          sanitizedValues: validation.sanitizedValues,
+          issues,
+          fallbackApplied,
+        },
+        cacheStatus
+      )
+    );
+
+    if (
+      cacheStatus === "miss" &&
+      !fallbackApplied &&
+      issues.length === 0 &&
+      Object.keys(generatedValues).length > 0
+    ) {
+      const cacheKey = cacheKeyInputs.get(template.id);
+      if (cacheKey) {
+        templateCompletionCache.set(cacheKey, validation.sanitizedValues);
+      }
     }
   }
 
@@ -284,17 +360,28 @@ const summarizeKnobs = (overrides: RecipeKnobOverrides) =>
     Object.entries(overrides).map(([key, value]) => [key, { value: value.value, changed: value.changedFromDefault }])
   );
 
-const buildTelemetry = (templateId: TemplateId, validation: SlotValidationResult): TemplateFillTelemetry => {
+interface ValidationSnapshot {
+  sanitizedValues: Record<string, string>;
+  issues: SlotValidationIssue[];
+  fallbackApplied: boolean;
+}
+
+const buildTelemetry = (
+  templateId: TemplateId,
+  snapshot: ValidationSnapshot,
+  cacheStatus: TemplateCacheStatus
+): TemplateFillTelemetry => {
   const hashedValues: Record<string, string> = {};
-  Object.entries(validation.sanitizedValues).forEach(([slotId, slotValue]) => {
+  Object.entries(snapshot.sanitizedValues).forEach(([slotId, slotValue]) => {
     hashedValues[slotId] = hashValue(slotValue);
   });
 
   return {
     templateId,
     hashedValues,
-    issues: validation.issues,
-    fallbackApplied: validation.fallbackApplied,
+    issues: snapshot.issues,
+    fallbackApplied: snapshot.fallbackApplied,
+    cacheStatus,
   };
 };
 
