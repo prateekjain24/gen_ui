@@ -179,17 +179,48 @@ function repairLLMPayload(payload: unknown): unknown {
 
   stepConfig.primaryCta = primaryCta;
 
-  const allowedKinds = new Set(['text', 'select', 'radio', 'checkbox']);
+  const allowedKinds = new Set([
+    'text',
+    'select',
+    'radio',
+    'checkbox',
+    'integration_picker',
+    'admin_toggle',
+    'teammate_invite',
+    'callout',
+    'checklist',
+    'info_badge',
+    'ai_hint',
+  ]);
   const kindAliases: Record<string, string> = {
     toggle: 'checkbox',
     switch: 'checkbox',
     dropdown: 'select',
     button: 'radio',
+    banner: 'callout',
+    pill: 'info_badge',
+    badge: 'info_badge',
+    hint: 'ai_hint',
+    helper: 'ai_hint',
+    multi_select: 'integration_picker',
+    integrations: 'integration_picker',
+    teammate_list: 'teammate_invite',
+    invites: 'teammate_invite',
+    segmented: 'admin_toggle',
   };
   const idRemap: Record<string, string> = {
     workspace_goal: 'primary_focus',
-    preferred_integrations: 'primary_focus',
+    preferred_integrations: 'preferred_integrations',
     notify_team: 'notification_preferences',
+    integrations: 'preferred_integrations',
+    team_invite_list: 'team_invites',
+    invite_list: 'team_invites',
+    admin_controls_toggle: 'admin_controls',
+    access_control: 'access_level',
+    audit_logs: 'audit_logging',
+    explorer_callout: 'guided_callout',
+    explorer_checklist: 'guided_checklist',
+    persona_badge: 'persona_info_badge',
   };
 
   if (Array.isArray(stepConfig.fields)) {
@@ -225,6 +256,54 @@ function repairLLMPayload(payload: unknown): unknown {
       }
 
       cloned.kind = mappedKind;
+
+      if (mappedKind === 'integration_picker') {
+        if (!Array.isArray(cloned.options)) {
+          cloned.options = [];
+        }
+        if (!Array.isArray(cloned.values)) {
+          const defaults = Array.isArray(cloned.defaultValues) ? cloned.defaultValues : [];
+          cloned.values = defaults;
+        }
+      }
+
+      if (mappedKind === 'admin_toggle') {
+        if (!Array.isArray(cloned.options)) {
+          cloned.options = [];
+        }
+        if (typeof cloned.defaultValue === 'string' && typeof cloned.value !== 'string') {
+          cloned.value = cloned.defaultValue;
+        }
+      }
+
+      if (mappedKind === 'teammate_invite') {
+        if (!Array.isArray(cloned.values)) {
+          const emails = Array.isArray(cloned.invites)
+            ? (cloned.invites as Array<{ email?: string }>)
+                .map((invite) => (invite && typeof invite.email === 'string' ? invite.email : null))
+                .filter((email): email is string => Boolean(email))
+            : [];
+          cloned.values = emails;
+        }
+        if (!Array.isArray(cloned.roleOptions)) {
+          cloned.roleOptions = [];
+        }
+        if ('invites' in cloned) {
+          delete cloned.invites;
+        }
+      }
+
+      if (mappedKind === 'callout' || mappedKind === 'checklist' || mappedKind === 'info_badge' || mappedKind === 'ai_hint') {
+        cloned.required = false;
+      }
+
+      if (mappedKind === 'callout' && typeof cloned.body !== 'string') {
+        cloned.body = typeof cloned.helperText === 'string' ? cloned.helperText : '';
+      }
+
+      if (mappedKind === 'ai_hint' && typeof cloned.body !== 'string') {
+        cloned.body = typeof cloned.helperText === 'string' ? cloned.helperText : '';
+      }
 
       if (typeof cloned.label !== 'string' || !cloned.label.trim()) {
         if (typeof cloned.id === 'string') {

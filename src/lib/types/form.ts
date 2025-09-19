@@ -20,6 +20,8 @@ export interface FieldOption {
   disabled?: boolean;
   /** Additional helper copy displayed for the option */
   helperText?: string;
+  /** Optional icon key for richer UI */
+  icon?: string;
 }
 
 /**
@@ -153,10 +155,108 @@ export interface CheckboxField extends BaseField {
 }
 
 /**
+ * Integration picker field configuration (AI-only)
+ */
+export interface IntegrationPickerField extends BaseField {
+  kind: 'integration_picker';
+  /** Available integration options */
+  options: FieldOption[];
+  /** Currently selected integration ids */
+  values?: string[];
+  /** Maximum number of integrations allowed */
+  maxSelections?: number;
+  /** Optional category label for grouping */
+  categoryLabel?: string;
+}
+
+/**
+ * Admin toggle field configuration (AI-only)
+ */
+export interface AdminToggleField extends BaseField {
+  kind: 'admin_toggle';
+  /** Toggle options rendered as segmented control */
+  options: FieldOption[];
+  /** Currently selected value */
+  value?: string;
+}
+
+/**
+ * Teammate invite field configuration (AI-only)
+ */
+export interface TeammateInviteField extends BaseField {
+  kind: 'teammate_invite';
+  /** Existing invite emails */
+  values?: string[];
+  /** Selectable roles for invitees */
+  roleOptions?: FieldOption[];
+  /** Maximum number of invite rows */
+  maxInvites?: number;
+  /** Placeholder for new invite input */
+  placeholder?: string;
+}
+
+/**
+ * Callout display block (AI-only)
+ */
+export interface CalloutField extends BaseField {
+  kind: 'callout';
+  /** Body copy displayed inside the callout */
+  body: string;
+  /** Visual variant */
+  variant?: 'info' | 'success' | 'warning';
+  /** Optional icon key */
+  icon?: string;
+  /** Optional link CTA */
+  cta?: { label: string; href?: string };
+}
+
+/**
+ * Checklist display block (AI-only)
+ */
+export interface ChecklistField extends BaseField {
+  kind: 'checklist';
+  /** Checklist items */
+  items: Array<{ id: string; label: string; helperText?: string }>;
+}
+
+/**
+ * Info badge display block (AI-only)
+ */
+export interface InfoBadgeField extends BaseField {
+  kind: 'info_badge';
+  /** Variant for styling */
+  variant?: 'info' | 'success' | 'warning' | 'danger';
+  /** Optional icon key */
+  icon?: string;
+}
+
+/**
+ * Inline AI hint attached to a field (AI-only)
+ */
+export interface AIHintField extends BaseField {
+  kind: 'ai_hint';
+  /** Short body text displayed inline */
+  body: string;
+  /** Field id this hint references */
+  targetFieldId?: string;
+}
+
+/**
  * Union type representing all possible field types
  * Uses discriminated union pattern with 'kind' property
  */
-export type Field = TextField | SelectField | RadioField | CheckboxField;
+export type Field =
+  | TextField
+  | SelectField
+  | RadioField
+  | CheckboxField
+  | IntegrationPickerField
+  | AdminToggleField
+  | TeammateInviteField
+  | CalloutField
+  | ChecklistField
+  | InfoBadgeField
+  | AIHintField;
 
 /**
  * Type guard to check if a field is a TextField
@@ -196,8 +296,14 @@ export const isCheckboxField = (field: Field): field is CheckboxField =>
  * @returns The field's value(s) as string or string array
  */
 export const getFieldValue = (field: Field): string | string[] | undefined => {
-  if (field.kind === 'checkbox') {
+  if (field.kind === 'checkbox' || field.kind === 'integration_picker') {
     return field.values;
+  }
+  if (field.kind === 'teammate_invite') {
+    return field.values ?? [];
+  }
+  if (field.kind === 'callout' || field.kind === 'checklist' || field.kind === 'info_badge' || field.kind === 'ai_hint') {
+    return undefined;
   }
   return field.value;
 };

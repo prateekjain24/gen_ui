@@ -66,6 +66,36 @@ export const FIELD_IDS = {
   TIMEZONE: 'timezone',
 
   // ============================================================================
+  // Adaptive / AI-Only Fields
+  // ============================================================================
+  /** Suggested integrations checklist */
+  PREFERRED_INTEGRATIONS: 'preferred_integrations',
+
+  /** Invite teammates email list */
+  TEAM_INVITES: 'team_invites',
+
+  /** Admin control toggle */
+  ADMIN_CONTROLS: 'admin_controls',
+
+  /** Access level selector */
+  ACCESS_LEVEL: 'access_level',
+
+  /** Audit log opt-in */
+  AUDIT_LOGGING: 'audit_logging',
+
+  /** Explorer reassurance callout */
+  GUIDED_CALLOUT: 'guided_callout',
+
+  /** Explorer next steps checklist */
+  GUIDED_CHECKLIST: 'guided_checklist',
+
+  /** Persona-specific info badge */
+  PERSONA_INFO_BADGE: 'persona_info_badge',
+
+  /** AI-generated hint attached to a field */
+  AI_HINT: 'ai_hint',
+
+  // ============================================================================
   // Additional Fields
   // ============================================================================
   /** How user heard about the product */
@@ -126,6 +156,15 @@ export const OPTIONAL_FIELD_IDS = [
   FIELD_IDS.TIMEZONE,
   FIELD_IDS.REFERRAL_SOURCE,
   FIELD_IDS.COMMENTS,
+  FIELD_IDS.PREFERRED_INTEGRATIONS,
+  FIELD_IDS.TEAM_INVITES,
+  FIELD_IDS.ADMIN_CONTROLS,
+  FIELD_IDS.ACCESS_LEVEL,
+  FIELD_IDS.AUDIT_LOGGING,
+  FIELD_IDS.GUIDED_CALLOUT,
+  FIELD_IDS.GUIDED_CHECKLIST,
+  FIELD_IDS.PERSONA_INFO_BADGE,
+  FIELD_IDS.AI_HINT,
 ] as const;
 
 /**
@@ -137,6 +176,7 @@ export const SENSITIVE_FIELD_IDS = [
   FIELD_IDS.FULL_NAME,
   FIELD_IDS.COMPANY,
   FIELD_IDS.COMMENTS,
+  FIELD_IDS.TEAM_INVITES,
 ] as const;
 
 /**
@@ -226,6 +266,17 @@ export const FIELD_STEP_MAP: Record<FieldId, string> = {
   [FIELD_IDS.THEME]: 'preferences',
   [FIELD_IDS.LANGUAGE]: 'preferences',
   [FIELD_IDS.TIMEZONE]: 'preferences',
+
+  // Adaptive / AI-only fields
+  [FIELD_IDS.PREFERRED_INTEGRATIONS]: 'preferences',
+  [FIELD_IDS.TEAM_INVITES]: 'workspace',
+  [FIELD_IDS.ADMIN_CONTROLS]: 'preferences',
+  [FIELD_IDS.ACCESS_LEVEL]: 'preferences',
+  [FIELD_IDS.AUDIT_LOGGING]: 'preferences',
+  [FIELD_IDS.GUIDED_CALLOUT]: 'workspace',
+  [FIELD_IDS.GUIDED_CHECKLIST]: 'workspace',
+  [FIELD_IDS.PERSONA_INFO_BADGE]: 'workspace',
+  [FIELD_IDS.AI_HINT]: 'basics',
 
   // Additional fields (various steps)
   [FIELD_IDS.REFERRAL_SOURCE]: 'basics',

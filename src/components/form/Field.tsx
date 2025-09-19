@@ -10,8 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { Field as FormField } from '@/lib/types/form';
 import { cn } from '@/lib/utils';
 
+type PrimitiveField = Extract<FormField, { kind: 'text' | 'select' | 'radio' | 'checkbox' }>;
+
 export interface FieldProps {
-  field: FormField;
+  field: PrimitiveField;
   stepId: string;
   value?: string | string[];
   onValueChange: (value: string | string[] | undefined) => void;

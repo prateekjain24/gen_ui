@@ -7,8 +7,10 @@ import { Field as FieldComponent } from './Field';
 import { FormContainer } from './FormContainer';
 import { Stepper } from './Stepper';
 
+import { ExperimentalFieldComponent } from '@/components/form/experimental';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ENV } from '@/lib/constants';
 import type { ButtonAction, Field, FormPlan } from '@/lib/types/form';
 import { isErrorPlan, isRenderStepPlan, isReviewPlan, isSuccessPlan } from '@/lib/types/form';
 import { cn } from '@/lib/utils';
@@ -30,12 +32,17 @@ const getInitialFieldValues = (fields: Field[]): FieldValues => {
   return fields.reduce<FieldValues>((acc, field) => {
     switch (field.kind) {
       case 'checkbox':
+      case 'integration_picker':
+      case 'teammate_invite':
         acc[field.id] = Array.isArray(field.values) ? field.values : [];
         break;
       case 'select':
       case 'radio':
       case 'text':
+      case 'admin_toggle':
         acc[field.id] = field.value ?? '';
+        break;
+      default:
         break;
     }
     return acc;
@@ -102,6 +109,7 @@ export function FormRenderer({
   const fieldSignature = isRenderStep
     ? plan.step.fields.map(field => `${field.id}:${field.kind}`).join('|')
     : '';
+  const enableExperimentalComponents = ENV.enableExperimentalComponents;
 
   React.useEffect(() => {
     if (!isRenderStep) {
@@ -144,17 +152,109 @@ export function FormRenderer({
           isSubmitting={isSubmitting}
           error={error}
         >
-          {step.fields.map(field => (
-            <FieldComponent
-              key={field.id}
-              field={field}
-              stepId={step.stepId}
-              value={fieldValues[field.id]}
-              onValueChange={value => handleValueChange(field.id, value, step.stepId)}
-              onFocus={(fieldId, stepId) => onFieldFocus?.(fieldId, stepId)}
-              onBlur={(fieldId, stepId) => onFieldBlur?.(fieldId, stepId)}
-            />
-          ))}
+          {step.fields.map(field => {
+            if (field.kind === 'callout') {
+              if (!enableExperimentalComponents) {
+                return null;
+              }
+              return <ExperimentalFieldComponent key={field.id} kind="callout" field={field} />;
+            }
+
+            if (field.kind === 'checklist') {
+              if (!enableExperimentalComponents) {
+                return null;
+              }
+              return <ExperimentalFieldComponent key={field.id} kind="checklist" field={field} />;
+            }
+
+            if (field.kind === 'info_badge') {
+              if (!enableExperimentalComponents) {
+                return (
+                  <span
+                    key={field.id}
+                    className="inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground"
+                  >
+                    {field.label}
+                  </span>
+                );
+              }
+              return <ExperimentalFieldComponent key={field.id} kind="info_badge" field={field} />;
+            }
+
+            if (field.kind === 'ai_hint') {
+              return <ExperimentalFieldComponent key={field.id} kind="ai_hint" field={field} />;
+            }
+
+            if (field.kind === 'integration_picker') {
+              const currentValue = Array.isArray(fieldValues[field.id])
+                ? (fieldValues[field.id] as string[])
+                : Array.isArray(field.values)
+                  ? field.values
+                  : [];
+              return (
+                <ExperimentalFieldComponent
+                  key={field.id}
+                  kind="integration_picker"
+                  field={field}
+                  value={currentValue}
+                  onChange={next => handleValueChange(field.id, next, step.stepId)}
+                  onFocus={fieldId => onFieldFocus?.(fieldId, step.stepId)}
+                  onBlur={fieldId => onFieldBlur?.(fieldId, step.stepId)}
+                />
+              );
+            }
+
+            if (field.kind === 'admin_toggle') {
+              const currentValue =
+                typeof fieldValues[field.id] === 'string'
+                  ? (fieldValues[field.id] as string)
+                  : field.value ?? '';
+              return (
+                <ExperimentalFieldComponent
+                  key={field.id}
+                  kind="admin_toggle"
+                  field={field}
+                  value={currentValue}
+                  onChange={next => handleValueChange(field.id, next, step.stepId)}
+                  onFocus={fieldId => onFieldFocus?.(fieldId, step.stepId)}
+                  onBlur={fieldId => onFieldBlur?.(fieldId, step.stepId)}
+                />
+              );
+            }
+
+            if (field.kind === 'teammate_invite') {
+              const currentValue = Array.isArray(fieldValues[field.id])
+                ? (fieldValues[field.id] as string[])
+                : Array.isArray(field.values)
+                  ? field.values
+                  : [];
+              return (
+                <ExperimentalFieldComponent
+                  key={field.id}
+                  kind="teammate_invite"
+                  field={field}
+                  value={currentValue}
+                  onChange={next => handleValueChange(field.id, next, step.stepId)}
+                  onFocus={fieldId => onFieldFocus?.(fieldId, step.stepId)}
+                  onBlur={fieldId => onFieldBlur?.(fieldId, step.stepId)}
+                />
+              );
+            }
+
+            const primitiveField = field as Extract<Field, { kind: 'text' | 'select' | 'radio' | 'checkbox' }>;
+
+            return (
+              <FieldComponent
+                key={primitiveField.id}
+                field={primitiveField}
+                stepId={step.stepId}
+                value={fieldValues[primitiveField.id]}
+                onValueChange={value => handleValueChange(primitiveField.id, value, step.stepId)}
+                onFocus={(fieldId, stepId) => onFieldFocus?.(fieldId, stepId)}
+                onBlur={(fieldId, stepId) => onFieldBlur?.(fieldId, stepId)}
+              />
+            );
+          })}
         </FormContainer>
       </div>
     );

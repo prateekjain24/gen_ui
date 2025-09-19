@@ -258,4 +258,7 @@ export const ENV = {
 
   /** Check if debug mode is enabled */
   isDebug: process.env.NEXT_PUBLIC_DEBUG === 'true',
+
+  /** Enable experimental AI-driven components */
+  enableExperimentalComponents: process.env.NEXT_PUBLIC_ENABLE_EXPERIMENTAL_COMPONENTS !== 'false',
 } as const;
