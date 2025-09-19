@@ -120,3 +120,33 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .stagger-fade-in {
+    opacity: 0;
+    transform: translateY(0.75rem);
+    animation-name: stagger-fade-in;
+    animation-duration: 280ms;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    animation-fill-mode: forwards;
+  }
+}
+
+@keyframes stagger-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stagger-fade-in {
+    animation-duration: 1ms;
+    transform: none;
+    opacity: 1;
+  }
+}
