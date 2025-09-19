@@ -6,6 +6,8 @@ import { getNextStepPlan } from '@/lib/policy/rules';
 import { sessionStore } from '@/lib/store/session';
 import { createDebugger } from '@/lib/utils/debug';
 
+export const runtime = 'nodejs';
+
 type DecisionSource = (typeof DECISION_SOURCES)[keyof typeof DECISION_SOURCES];
 
 type PlanStrategy = 'auto' | 'rules' | 'llm';

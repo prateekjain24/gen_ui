@@ -123,7 +123,7 @@ describe('OnboardingFlow', () => {
 
     expect(container.textContent).toContain('Basics');
     expect(createSession).toHaveBeenCalledTimes(1);
-    expect(fetchPlan).toHaveBeenCalledWith('session-123');
+    expect(fetchPlan).toHaveBeenCalledWith('session-123', { strategy: 'rules' });
     expect(createTelemetryQueueMock).toHaveBeenCalledWith('session-123');
   });
 
@@ -162,7 +162,8 @@ describe('OnboardingFlow', () => {
       })
     );
 
-    expect(fetchPlan).toHaveBeenLastCalledWith('session-123');
+    expect(fetchPlan).toHaveBeenNthCalledWith(1, 'session-123', { strategy: 'rules' });
+    expect(fetchPlan).toHaveBeenLastCalledWith('session-123', { strategy: 'llm' });
     expect(container.textContent).toContain('Workspace');
     const capturedEvents = enqueueMock.mock.calls.map(call => call[0] as Record<string, unknown>);
     expect(capturedEvents.some(event => event.type === 'field_change' && event.fieldId === 'full_name')).toBe(true);
@@ -197,7 +198,8 @@ describe('OnboardingFlow', () => {
       })
     );
 
-    expect(fetchPlan).toHaveBeenLastCalledWith('session-456');
+    expect(fetchPlan).toHaveBeenNthCalledWith(1, 'session-456', { strategy: 'rules' });
+    expect(fetchPlan).toHaveBeenLastCalledWith('session-456', { strategy: 'llm' });
     const backEvents = enqueueMock.mock.calls
       .map(call => call[0] as Record<string, unknown>)
       .filter(event => event.type === 'step_back');

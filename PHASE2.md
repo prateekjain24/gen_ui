@@ -11,20 +11,14 @@ Demonstrate an adaptive onboarding flow powered by OpenAI while keeping the scop
 4. **P2-004 · Context builder** – Session serialization, recent events, engagement score.
 5. **P2-005/006 · Decision post-processing** – Response validation and context-aware field enhancer.
 6. **P2-007 · Behavior analysis** – Hesitation detection, correction loops, abandonment risk, time-on-step metrics.
+7. **P2-POC-01 · Decision toggle & fallback UX** – Debug toggle defaults to LLM, waits for signals, surfaces fallback notice.
+8. **P2-POC-02 · Eval logging stub** – JSONL logger + Airtable sync CLI (`bun run push:evals`).
+9. **P2-POC-03 · Railway deployment checklist** – Documented env vars, volume strategy, and smoke tests (`docs/railway-checklist.md`).
 
 ---
 ## Remaining POC Tickets
-| ID | Title | Goal | Acceptance Criteria |
-|----|-------|------|---------------------|
-| **P2-POC-01** | Decision toggle & fallback UX | Wire the rules+LLM switch with graceful failure states. | - Config flag to enable/disable LLM per session<br>- `generatePlanWithLLM` errors surface a fallback plan + toast<br>- Decision source logged (`rules`, `llm`, `fallback`). |
-| **P2-POC-02** | Eval logging stub | Persist each LLM decision for later labeling. | - JSON Lines written per decision (context + output)<br>- CLI script pushes rows to Airtable (no UI work yet)<br>- Docs in `Eval.md` updated with run instructions. |
-| **P2-POC-03** | Railway deployment checklist | Ship the app on Railway with bun runtime. | - Build/start commands set (`bun run build`, `bun run start`)<br>- Env vars (`OPENAI_*`, `NEXT_PUBLIC_API_URL`) documented<br>- Health check & smoke test notes recorded. |
 
-> Optional polish (only if time permits): add a minimal Usage card in the dev debug panel showing behavior signals from P2-007.
-
-- ✅ **P2-POC-01** – Toggle available in the debug panel, API respects strategy, rules fallback surfaced when LLM unavailable.
-- ⏳ **P2-POC-02** – Pending.
-- ⏳ **P2-POC-03** – Pending.
+All Phase 2 POC tickets are now complete. Future iterations should split out polish items (e.g., behavior signal cards) into Phase 3.
 
 ---
 ## Deferred / Backlog (Post-POC)

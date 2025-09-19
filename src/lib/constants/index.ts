@@ -63,6 +63,7 @@ export {
 export {
   LLM_CONFIG,
   DECISION_SOURCES,
+  EVAL_LOG_CONFIG,
   SYSTEM_PROMPTS,
   LLM_SCHEMAS,
   LLM_TELEMETRY_EVENTS,
@@ -71,6 +72,7 @@ export {
   isLLMEnabled,
   shouldUseLLM,
   formatSystemPrompt,
+  PROMPT_VERSION,
   type DecisionSource,
 } from './llm';
 

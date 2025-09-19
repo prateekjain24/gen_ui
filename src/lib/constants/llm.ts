@@ -12,15 +12,21 @@
 const FALLBACK_MODEL = 'gpt-5-mini';
 const configuredModel = process.env.OPENAI_MODEL?.trim() || FALLBACK_MODEL;
 
+const DEFAULT_PROMPT_VERSION = '2025-09-19-form-orchestrator';
+const promptVersion = process.env.LLM_PROMPT_VERSION?.trim() || DEFAULT_PROMPT_VERSION;
+const evalLogDir = process.env.EVAL_LOG_DIR?.trim() || 'eval/logs';
+const enableEvalLogging = process.env.ENABLE_EVAL_LOGGING !== 'false';
+const airtableTableName = process.env.AIRTABLE_TABLE_NAME?.trim() || 'llm_decisions';
+
 export const LLM_CONFIG = {
   /** OpenAI model to use for form decisions */
   model: configuredModel,
 
   /** Maximum tokens for response */
-  maxTokens: 1000,
+  maxTokens: 4000,
 
   /** Timeout for LLM calls in milliseconds */
-  timeout: 15000,
+  timeout: 120000,
 
   /** Frequency penalty to reduce repetition */
   frequencyPenalty: 0.0,
@@ -44,6 +50,23 @@ export const LLM_CONFIG = {
     /** Random jitter percentage applied to delays */
     jitterRatio: 0.2,
   },
+} as const;
+
+/**
+ * Prompt versioning used for eval tracking and regression comparisons.
+ */
+export const PROMPT_VERSION = promptVersion;
+
+/**
+ * Evaluation logging configuration.
+ */
+export const EVAL_LOG_CONFIG = {
+  /** Whether JSONL logging is enabled */
+  enable: enableEvalLogging,
+  /** Directory (relative or absolute) for eval logs */
+  logDir: evalLogDir,
+  /** Airtable table name for sync script */
+  airtableTable: airtableTableName,
 } as const;
 
 /**
@@ -87,11 +110,13 @@ export const SYSTEM_PROMPTS = {
 ### Constraints
 - Only reference step IDs from {basics, workspace, preferences, review} and field IDs from the approved whitelist.
 - Limit fields to ≤6 per step; prefer ≤4 when persona is explorer or risk is elevated.
+- Field kinds must be one of 'text', 'select', 'radio', 'checkbox'. Map any other interaction to the closest allowed kind or omit it entirely.
 - For single-select inputs use 'defaultValue'; for multi-select use 'defaultValues' (never both).
 - Titles ≤60 characters, descriptions ≤160 characters, helper text ≤160 characters.
-- Primary CTA must be provided; secondary CTA is optional.
+- Primary CTA must be an object with { label, action }. Valid actions: 'submit_step', 'back', 'skip', 'complete'. Secondary CTA is optional.
 - Reasoning must be concise (≤280 characters) and describe the decisive signals used.
-- Confidence must be between 0 and 1. Treat <0.4 as low, 0.4-0.7 medium, >0.7 high.
+- Confidence must be between 0 and 1. Treat <0.4 as low, 0.4-0.7 medium, >0.7 high. Clamp into range instead of emitting out-of-bounds values.
+- Map persona synonyms: individual/personal/solo ⇒ 'explorer'; team/collaborator/organization ⇒ 'team'.
 - metadata.decision must be one of {progress, review, fallback}. Use 'fallback' when you cannot make a confident recommendation.
 
 ### Output contract
@@ -102,7 +127,43 @@ export const SYSTEM_PROMPTS = {
 - When recommending review, set 'skipToReview: true' and omit non-essential fields.
 - When confidence is low, favor keeping the user in the current step with minimal adjustments.
 
-Focus on delivering the smallest, highest-impact set of fields for the next step while satisfying the constraints above.`,
+Focus on delivering the smallest, highest-impact set of fields for the next step while satisfying the constraints above.
+
+### Expected response template
+Example JSON:
+{
+  "metadata": {
+    "reasoning": "Explorer persona with corrections on identity fields—keep the next step light",
+    "confidence": 0.72,
+    "persona": "explorer",
+    "decision": "progress"
+  },
+  "stepConfig": {
+    "stepId": "workspace",
+    "title": "Set up your workspace",
+    "description": "Choose a workspace name and focus so we can personalise recommendations.",
+    "fields": [
+      {
+        "kind": "text",
+        "id": "workspace_name",
+        "label": "Workspace name",
+        "placeholder": "e.g. Design Lab",
+        "required": false
+      },
+      {
+        "kind": "select",
+        "id": "primary_focus",
+        "label": "What will you work on?",
+        "defaultValue": "personal_projects"
+      }
+    ],
+    "primaryCta": {
+      "label": "Continue",
+      "action": "submit_step"
+    }
+  }
+}
+`,
 
   /**
    * Field configuration prompt

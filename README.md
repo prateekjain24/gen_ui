@@ -35,6 +35,13 @@ This repository contains a Next.js proof of concept that teaches a computer how 
 
 In other words, the person filling out the form sees a friendly assistant that adapts to them. Behind the scenes we always keep a safe rules engine ready, so the experience never breaks.
 
+### A Tale of Two Journeys
+
+- **Maya (solo designer):** breezes through the basics, skips workspace settings, and hesitates on pricing. The AI keeps her flow under three steps, prefills optional fields, and suggests “Skip for now” CTAs.
+- **Leo (team lead):** enters a company domain, invites 7 teammates, and selects “project templates.” The AI adds workspace configuration, integration checkboxes, and keeps review mandatory so he can double-check details.
+
+Both flows start with rules, but once each person submits their first step the LLM takes the lead, tailoring the next screen while the debug panel shows how confident the model felt and why.
+
 ---
 ## Current Capabilities (Phase 2 Summary)
 
@@ -46,9 +53,9 @@ In other words, the person filling out the form sees a friendly assistant that a
 | User context builder | ✅ | Session snapshot, recent events, engagement scoring. |
 | LLM response parsing & enhancement | ✅ | Zod-based validation + persona placeholders, defaults, option filtering. |
 | Behavior analytics | ✅ | Hesitation, corrections, abandonment risk, time-on-step metrics. |
-| Decision toggle & fallback UX | ✅ | Rules/LLM switch, graceful fallback, debug panel control. |
-| Eval logging (coming) | ⏳ | Will capture each AI decision for future labeling. |
-| Railway deployment checklist (coming) | ⏳ | Documented build commands, env vars, smoke tests pending. |
+| Decision toggle & fallback UX | ✅ | Default strategy is LLM, waits for user signals, surfaces fallback banner. |
+| Eval logging | ✅ | JSONL logger + `bun run push:evals` to sync with Airtable. |
+| Railway deployment checklist | ✅ | See `docs/railway-checklist.md` for env vars, volume strategy, smoke tests. |
 
 ---
 ## Getting Started (Developers)
@@ -67,11 +74,20 @@ bun install
 | Key | Description | Example |
 |-----|-------------|---------|
 | `OPENAI_API_KEY` | OpenAI API key for GPT-5 Mini calls. | `sk-...` |
-| `OPENAI_MODEL` | Default LLM model (already set to `gpt-5-mini`). | `gpt-5-mini` |
+| `OPENAI_MODEL` | Default LLM model. Keep at `gpt-5-mini` for this POC. | `gpt-5-mini` |
+| `LLM_PROMPT_VERSION` | Version string stamped into eval logs. Update when prompts change. | `2025-09-19-form-orchestrator` |
 | `ENABLE_LLM_ORCHESTRATION` | Turn AI orchestration on/off (`true`/`false`). | `true` |
 | `LLM_ROLLOUT_PERCENTAGE` | Percentage of sessions that use the LLM when strategy = auto. | `100` |
+| `ENABLE_EVAL_LOGGING` | Toggle JSONL logging (set `false` if storage-constrained). | `true` |
+| `EVAL_LOG_DIR` | Directory for eval logs (use a persistent volume in hosting). | `eval/logs` |
+| `AIRTABLE_API_KEY` | Airtable token for `bun run push:evals`. | `pat-...` |
+| `AIRTABLE_BASE_ID` | Airtable base that hosts the `llm_decisions` table. | `appXXXXXXXXXXXXXX` |
+| `AIRTABLE_TABLE_NAME` | Airtable table name (override if different). | `llm_decisions` |
 | `NEXT_PUBLIC_API_URL` | Public base URL (used in debug panel). | `http://localhost:3000` |
-| `NEXT_PUBLIC_LLM_STRATEGY` | Default client strategy (`llm` or `rules`). | `rules` |
+| `NEXT_PUBLIC_LLM_STRATEGY` | Default client strategy. Defaults to LLM now. | `llm` |
+| `NEXT_PUBLIC_DEBUG` | `true` forces the debug panel on (great for demos). | `true` |
+
+> Copy `.env.example` to `.env.local` and fill in the blanks. Environment variables prefixed with `NEXT_PUBLIC_` are safe for the browser; everything else stays server-side.
 
 ### 4. Run the POC
 ```bash
@@ -91,11 +107,13 @@ Visit [`http://localhost:3000/onboarding`](http://localhost:3000/onboarding) and
 | `bunx jest` or `bun run test` | Run the unit suite. |
 | `bun run build` & `bun run start` | Production build + serve (used for Railway). |
 | `bun run check` | Runs lint, typecheck, tests in sequence. |
+| `bun run push:evals` / `push:evals:dry` | Sync eval JSONL records to Airtable (or preview). |
 
 ---
 ## Debug Panel & Strategy Toggle
 - **Plan Source** shows `rules`, `llm`, or `fallback`.
 - **LLM Strategy** displays the active strategy and provides a toggle.
+- Default strategy is `LLM`, but the first screen still uses rules until we collect real user signals.
 - The selected strategy is stored in `sessionStorage` (`gen_ui_llm_strategy`) so page refreshes keep your choice.
 - When the AI is unavailable, the UI reverts to the rules plan and displays a warning banner in-app.
 
@@ -109,20 +127,19 @@ Visit [`http://localhost:3000/onboarding`](http://localhost:3000/onboarding) and
 This means the POC can demo AI-driven behavior without risking a broken experience.
 
 ---
-## Evaluation & Logging Plan (Upcoming)
-- Every time the AI returns a plan we will store a JSONL record containing: session context, AI metadata, enhanced plan, and decision source.
-- A Bun script will sync these records to Airtable so non-technical reviewers can label them (`pass`/`fail` with notes).
-- The labeled set will drive regression checks when we tweak prompts or models (see `Eval.md` for the evolving playbook).
+## Evaluation & Logging Workflow
+- Each LLM decision appends a JSONL record in `eval/logs/<date>.jsonl` (session context, enhanced plan, reasoning, confidence).
+- Run `bun run push:evals` to push new rows to Airtable for human labeling (use `--dry-run` to preview).
+- `Eval.md` documents the schema, sync state file, and roadmap for replaying decisions against future prompts.
 
 ---
 ## Deployment Preview (Railway)
 - Build command: `bun run build`
 - Start command: `bun run start`
-- Ensure `ENABLE_LLM_ORCHESTRATION` and `OPENAI_API_KEY` are set in Railway variables.
-- Health check: GET `/` returns the Next.js landing page.
-- After deploy, run a smoke test: load `/onboarding`, toggle LLM on, confirm fallback message appears if the model key is missing.
-
-A dedicated “Railway deployment checklist” ticket tracks the full validation steps.
+- Health check: GET `/`
+- Attach a persistent volume and set `EVAL_LOG_DIR=/data/eval/logs` so eval records survive restarts.
+- Required secrets: `OPENAI_API_KEY`, `OPENAI_MODEL=gpt-5-mini`, `LLM_PROMPT_VERSION`, `ENABLE_LLM_ORCHESTRATION`, `AIRTABLE_*`.
+- After deploy run the smoke test in [docs/railway-checklist.md](docs/railway-checklist.md) (LLM toggle, fallback banner, eval sync dry-run).
 
 ---
 ## Testing Checklist Before Demos
@@ -131,6 +148,7 @@ A dedicated “Railway deployment checklist” ticket tracks the full validation
 3. Toggle to LLM, repeat as a “team” persona (fill `team_size` ≥ 5) → confirm additional fields appear.
 4. Force fallback (temporarily unset `OPENAI_API_KEY`) → confirm warning and rules plan.
 5. Inspect debug panel for correct plan source and signal summaries.
+6. Run `bun run push:evals:dry` to confirm eval logs are being collected locally.
 
 ---
 ## Troubleshooting & FAQs
@@ -138,11 +156,13 @@ A dedicated “Railway deployment checklist” ticket tracks the full validation
 - **“Where do I see what the AI decided?”** Open the debug panel and expand “Plan payload”. It shows the enhanced plan we render.
 - **“Can we disable the AI in production?”** Yes. Set `ENABLE_LLM_ORCHESTRATION=false` or reduce `LLM_ROLLOUT_PERCENTAGE` to 0. Clients can also default to the rules strategy.
 - **“What data leaves the browser?”** Only the fields and events needed to determine the next step. Sensitive values (emails, comments) are sanitized or truncated before logging.
+- **“Can we raise the 1000-token max?”** The current cap keeps latency under ~15s and avoids higher per-call costs on GPT-5 Mini reasoning mode, which already ignores settings like `temperature`/`top_p`.citeturn1search0 Increase it only if we see signs the model lacks enough space to include instructions or reasoning.
 
 ---
 ## Roadmap (Post-POC)
-- Automated eval logging & Airtable sync (P2-POC-02).
-- Railway deployment & smoke test documentation (P2-POC-03).
+- Eval replay harness & CI guardrails.
+- Lightweight reviewer UI for browsing JSONL logs without Airtable.
+- Usage insights card in the debug panel (surfacing hesitation/correction metrics live).
 - A/B testing, telemetry dashboards, and production hardening once the POC is validated.
 
 ---

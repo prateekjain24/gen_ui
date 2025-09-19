@@ -25,7 +25,7 @@ jest.mock('@/lib/llm/response-parser', () => {
   const actual = jest.requireActual('@/lib/llm/response-parser');
   return {
     ...actual,
-    parseLLMDecisionFromText: jest.fn(),
+    parseLLMDecision: jest.fn(),
   };
 });
 
@@ -53,7 +53,7 @@ describe('generatePlanWithLLM', () => {
     retryWithExponentialBackoff: jest.Mock;
     shouldRetryOnError: jest.Mock;
   };
-  const getParserMock = () => jest.requireMock('@/lib/llm/response-parser').parseLLMDecisionFromText as jest.Mock;
+  const getParserMock = () => jest.requireMock('@/lib/llm/response-parser').parseLLMDecision as jest.Mock;
 
   beforeEach(() => {
     jest.resetModules();
@@ -176,6 +176,216 @@ describe('generatePlanWithLLM', () => {
       totalTokens: 16,
     });
     expect(parseMock).toHaveBeenCalledTimes(1);
+    expect(parseMock).toHaveBeenCalledWith(expect.any(Object), expect.anything());
+  });
+
+  it('parses tool call args when text output is empty', async () => {
+    process.env.OPENAI_API_KEY = 'test-key';
+
+    const clientMocks = getClientMocks();
+    const provider = jest.fn().mockReturnValue('model-instance');
+    clientMocks.getOpenAIProvider.mockReturnValue(provider);
+    clientMocks.invokeWithTimeout.mockImplementation((_timeout, operation) => operation(new AbortController().signal));
+    clientMocks.retryWithExponentialBackoff.mockImplementation(async (operation, _settings) => operation(1));
+    clientMocks.shouldRetryOnError.mockReturnValue(true);
+
+    const generateTextMock = getGenerateTextMock();
+    const parseMock = getParserMock();
+    const usageRecorder = getUsageRecorder();
+
+    const toolPayload = {
+      metadata: { reasoning: 'tool-call', confidence: 0.91, decision: 'progress' },
+      stepConfig: {
+        stepId: 'workspace',
+        title: 'Workspace step',
+        fields: [],
+        primaryCta: { label: 'Continue', action: 'submit_step' },
+      },
+    };
+
+    generateTextMock.mockResolvedValue({
+      text: '',
+      usage: {
+        inputTokens: 20,
+        outputTokens: 8,
+        totalTokens: 28,
+      },
+      toolCalls: [
+        {
+          toolName: 'propose_next_step',
+          input: toolPayload,
+        },
+      ],
+    });
+
+    parseMock.mockReturnValue({
+      metadata: toolPayload.metadata,
+      raw: toolPayload.stepConfig,
+      plan: {
+        kind: 'render_step',
+        step: {
+          stepId: 'workspace',
+          title: 'Workspace step',
+          fields: [],
+          primaryCta: { label: 'Continue', action: 'submit_step' },
+        },
+        stepper: [],
+      },
+    });
+
+    const { generatePlanWithLLM } = await import('@/lib/policy/llm');
+
+    await generatePlanWithLLM(baseSession());
+
+    expect(usageRecorder).toHaveBeenCalledWith({
+      inputTokens: 20,
+      outputTokens: 8,
+      totalTokens: 28,
+    });
+    expect(parseMock).toHaveBeenCalledTimes(1);
+    expect(parseMock.mock.calls[0]?.[0]).toEqual(toolPayload);
+  });
+
+  it('parses propose_next_step wrapper when text output is wrapped', async () => {
+    process.env.OPENAI_API_KEY = 'test-key';
+
+    const clientMocks = getClientMocks();
+    const provider = jest.fn().mockReturnValue('model-instance');
+    clientMocks.getOpenAIProvider.mockReturnValue(provider);
+    clientMocks.invokeWithTimeout.mockImplementation((_timeout, operation) => operation(new AbortController().signal));
+    clientMocks.retryWithExponentialBackoff.mockImplementation(async (operation, _settings) => operation(1));
+    clientMocks.shouldRetryOnError.mockReturnValue(true);
+
+    const generateTextMock = getGenerateTextMock();
+    const parseMock = getParserMock();
+
+    const wrappedPayload = {
+      metadata: { reasoning: 'wrapper', confidence: 0.72, decision: 'progress' },
+      stepConfig: {
+        stepId: 'workspace',
+        title: 'Workspace step',
+        fields: [],
+        primaryCta: { label: 'Continue', action: 'submit_step' },
+      },
+    };
+
+    generateTextMock.mockResolvedValue({
+      text: `propose_next_step(${JSON.stringify(wrappedPayload)});`,
+      usage: {
+        inputTokens: 15,
+        outputTokens: 6,
+        totalTokens: 21,
+      },
+    });
+
+    parseMock.mockReturnValue({
+      metadata: wrappedPayload.metadata,
+      raw: wrappedPayload.stepConfig,
+      plan: {
+        kind: 'render_step',
+        step: {
+          stepId: 'workspace',
+          title: 'Workspace step',
+          fields: [],
+          primaryCta: { label: 'Continue', action: 'submit_step' },
+        },
+        stepper: [],
+      },
+    });
+
+    const { generatePlanWithLLM } = await import('@/lib/policy/llm');
+
+    await generatePlanWithLLM(baseSession());
+
+    expect(parseMock).toHaveBeenCalledTimes(1);
+    expect(parseMock.mock.calls[0]?.[0]).toEqual(wrappedPayload);
+
+    expect(parseMock).toHaveBeenCalledWith(expect.any(Object), expect.anything());
+  });
+
+  it('repairs payloads with out-of-range confidence, unsupported kinds, and string CTAs', async () => {
+    process.env.OPENAI_API_KEY = 'test-key';
+
+    const clientMocks = getClientMocks();
+    const provider = jest.fn().mockReturnValue('model-instance');
+    clientMocks.getOpenAIProvider.mockReturnValue(provider);
+    clientMocks.invokeWithTimeout.mockImplementation((_timeout, operation) => operation(new AbortController().signal));
+    clientMocks.retryWithExponentialBackoff.mockImplementation(async (operation, _settings) => operation(1));
+    clientMocks.shouldRetryOnError.mockReturnValue(true);
+
+    const generateTextMock = getGenerateTextMock();
+    const parseMock = getParserMock();
+
+  const malformedPayload = {
+    metadata: { reasoning: 'repair-needed', confidence: 1.4, persona: 'personal', decision: 'progress' },
+    stepConfig: {
+      stepId: 'workspace',
+      fields: [
+        {
+          kind: 'toggle',
+          id: 'notify_team',
+          label: '',
+        },
+      ],
+      primaryCta: 'Continue to workspace',
+    },
+  };
+
+    generateTextMock.mockResolvedValue({
+      text: JSON.stringify(malformedPayload),
+      usage: {
+        inputTokens: 12,
+        outputTokens: 6,
+        totalTokens: 18,
+      },
+    });
+
+    parseMock.mockReturnValue({
+      metadata: { reasoning: 'repair-needed', confidence: 1, persona: 'explorer', decision: 'progress' },
+      raw: {
+        stepId: 'workspace',
+        title: 'Workspace',
+        fields: [
+          {
+            kind: 'checkbox',
+            id: 'notify_team',
+            label: 'Notify Team',
+          },
+        ],
+        primaryCta: { label: 'Continue to workspace', action: 'submit_step' },
+      },
+      plan: {
+        kind: 'render_step',
+        step: {
+          stepId: 'workspace',
+          title: 'Workspace',
+          fields: [
+            {
+              kind: 'checkbox',
+              id: 'notify_team',
+              label: 'Notify Team',
+            },
+          ],
+          primaryCta: { label: 'Continue to workspace', action: 'submit_step' },
+        },
+        stepper: [],
+      },
+    });
+
+    const { generatePlanWithLLM } = await import('@/lib/policy/llm');
+
+    await generatePlanWithLLM(baseSession());
+
+    expect(parseMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ confidence: 1, persona: 'explorer' }),
+        stepConfig: expect.objectContaining({
+          title: 'Workspace',
+          primaryCta: expect.objectContaining({ label: 'Continue to workspace', action: 'submit_step' }),
+        }),
+      }),
+      expect.anything()
+    );
   });
 
   it('handles errors from the retry helper gracefully', async () => {

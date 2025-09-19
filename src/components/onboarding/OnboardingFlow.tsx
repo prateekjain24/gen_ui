@@ -35,7 +35,7 @@ const isFilled = (value: unknown): boolean => {
 const SESSION_STORAGE_KEY = 'gen_ui_session_id';
 const LLM_STRATEGY_STORAGE_KEY = 'gen_ui_llm_strategy';
 const DEFAULT_LLM_STRATEGY =
-  process.env.NEXT_PUBLIC_LLM_STRATEGY === 'llm' ? 'llm' : 'rules';
+  process.env.NEXT_PUBLIC_LLM_STRATEGY === 'rules' ? 'rules' : 'llm';
 
 function extractCompletedSteps(stepper: StepperItem[]): string[] {
   return stepper.filter(step => step.completed).map(step => step.id);
@@ -113,6 +113,8 @@ export function OnboardingFlow() {
     const stored = window.sessionStorage.getItem(LLM_STRATEGY_STORAGE_KEY) as 'llm' | 'rules' | null;
     if (stored) {
       setLlmStrategy(stored);
+    } else {
+      window.sessionStorage.setItem(LLM_STRATEGY_STORAGE_KEY, DEFAULT_LLM_STRATEGY);
     }
   }, []);
 
@@ -127,7 +129,8 @@ export function OnboardingFlow() {
       }
 
       try {
-        const hasSignals = hasCollectedSignals || planSource === 'llm';
+        const hasSignals =
+          overrideStrategy === 'llm' || hasCollectedSignals || planSource === 'llm';
         const desiredStrategy = overrideStrategy ?? (llmStrategy === 'llm' && hasSignals ? 'llm' : 'rules');
         const { plan: nextPlan, source, metadata } = await fetchPlan(currentSessionId, {
           strategy: desiredStrategy,
@@ -334,12 +337,15 @@ export function OnboardingFlow() {
 
       const activeStepId = getActiveStepId(plan);
 
-      const persist = async (payload: Omit<Parameters<typeof updateSession>[0], 'sessionId'>) => {
+      const persist = async (
+        payload: Omit<Parameters<typeof updateSession>[0], 'sessionId'>,
+        strategyOverride: 'llm' | 'rules'
+      ) => {
         setIsSubmitting(true);
         setError(null);
         try {
           await updateSession({ sessionId, ...payload });
-          await refreshPlan(sessionId);
+          await refreshPlan(sessionId, strategyOverride);
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Failed to update session';
           setError(message);
@@ -379,11 +385,14 @@ export function OnboardingFlow() {
 
         setHasCollectedSignals(true);
 
-        await persist({
-          values,
-          currentStep: activeStepId,
-          addCompletedStep: activeStepId,
-        });
+        await persist(
+          {
+            values,
+            currentStep: activeStepId,
+            addCompletedStep: activeStepId,
+          },
+          llmStrategy
+        );
         return;
       }
 
@@ -399,10 +408,13 @@ export function OnboardingFlow() {
 
         setHasCollectedSignals(true);
 
-        await persist({
-          currentStep: activeStepId,
-          addCompletedStep: activeStepId,
-        });
+        await persist(
+          {
+            currentStep: activeStepId,
+            addCompletedStep: activeStepId,
+          },
+          llmStrategy
+        );
         return;
       }
 
@@ -420,10 +432,13 @@ export function OnboardingFlow() {
           });
         }
 
-        await persist({
-          currentStep: previousStepId,
-          completedSteps: trimmed,
-        });
+        await persist(
+          {
+            currentStep: previousStepId,
+            completedSteps: trimmed,
+          },
+          llmStrategy
+        );
         return;
       }
 
@@ -447,10 +462,13 @@ export function OnboardingFlow() {
           });
         }
 
-        await persist({
-          currentStep: stepId,
-          addCompletedStep: stepId,
-        });
+        await persist(
+          {
+            currentStep: stepId,
+            addCompletedStep: stepId,
+          },
+          llmStrategy
+        );
         return;
       }
 
@@ -470,17 +488,20 @@ export function OnboardingFlow() {
           });
         }
 
-        await persist({
-          currentStep: previousStepId,
-          completedSteps: trimmed,
-        });
+        await persist(
+          {
+            currentStep: previousStepId,
+            completedSteps: trimmed,
+          },
+          llmStrategy
+        );
         return;
       }
 
       // For success or unhandled actions, attempt to refresh to stay in sync
-      await refreshPlan(sessionId);
+      await refreshPlan(sessionId, llmStrategy);
     },
-    [plan, sessionId, refreshPlan]
+    [plan, sessionId, refreshPlan, llmStrategy]
   );
 
   const handleRetry = React.useCallback(() => {

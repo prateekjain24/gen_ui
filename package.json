@@ -15,7 +15,9 @@
     "test:coverage": "bunx jest --coverage",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
-    "check": "bun run lint && bun run typecheck && bun run test"
+    "check": "bun run lint && bun run typecheck && bun run test",
+    "push:evals": "bun scripts/push-evals-to-airtable.ts",
+    "push:evals:dry": "bun scripts/push-evals-to-airtable.ts --dry-run"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.23",
