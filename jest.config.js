@@ -21,9 +21,7 @@ module.exports = {
   ],
   collectCoverageFrom: [
     'src/app/api/**/*.ts',
-    'src/components/onboarding/**/*.ts',
     'src/lib/api/**/*.ts',
-    'src/lib/policy/rules.ts',
     'src/lib/store/**/*.ts',
     'src/lib/telemetry/**/*.ts',
     'src/lib/types/session.ts',

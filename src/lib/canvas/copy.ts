@@ -11,7 +11,7 @@ export interface CanvasCopy {
 
 export const canvasCopy: CanvasCopy = {
   placeholder: "What do you want to get done today?",
-  helperText: "Canvas Chat will assemble a tailored workspace seconds after you submit.",
+  helperText: "Describe the onboarding or workspace you need—we'll assemble a tailored flow in seconds.",
   chips: [
     {
       label: "Plan a workspace for my team of 10 with Slack + Jira.",
