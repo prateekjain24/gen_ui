@@ -56,6 +56,7 @@ Both flows start with rules, but once each person submits their first step the L
 | Decision toggle & fallback UX | ✅ | Default strategy is LLM, waits for user signals, surfaces fallback banner. |
 | Eval logging | ✅ | JSONL logger + `bun run push:evals` to sync with Airtable. |
 | Railway deployment checklist | ✅ | See `docs/railway-checklist.md` for env vars, volume strategy, smoke tests. |
+| Guided entry copy & chips | ✅ | Canvas Chat placeholder, helper text, and auto-submitting example prompts match the Plan 2 copy deck. |
 
 ---
 ## Getting Started (Developers)

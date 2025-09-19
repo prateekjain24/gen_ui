@@ -9,18 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useStaggeredMount } from "@/hooks/useStaggeredMount";
+import { canvasCopy } from "@/lib/canvas/copy";
 import type { CanvasRecipe, CanvasRecipeId } from "@/lib/canvas/recipes";
 import { getRecipe } from "@/lib/canvas/recipes";
 import { ENV } from "@/lib/constants";
 import { createTelemetryQueue, type TelemetryQueue } from "@/lib/telemetry/events";
 import type { Field, FormPlan, StepperItem } from "@/lib/types/form";
 import { cn } from "@/lib/utils";
-
-const examplePrompts = [
-  "Create a quickstart workspace for my design sprint",
-  "Help me onboard a new analytics contractor",
-  "Draft a setup flow for a 5-person sales team",
-];
 
 type CanvasDecisionSource = "llm" | "heuristics";
 
@@ -268,7 +263,7 @@ export function CanvasChat(): React.ReactElement {
             <Input
               ref={inputRef}
               aria-label="Describe what you want to build"
-              placeholder="e.g. Build a workspace to welcome new clients"
+              placeholder={canvasCopy.placeholder}
               value={prompt}
               onChange={event => setPrompt(event.target.value)}
               className="flex-1"
@@ -285,18 +280,22 @@ export function CanvasChat(): React.ReactElement {
             </Button>
           </div>
 
+          <p className="text-xs text-muted-foreground">
+            {canvasCopy.helperText}
+          </p>
+
           <div className="flex flex-wrap items-center gap-2">
-            {examplePrompts.map(example => (
+            {canvasCopy.chips.map(chip => (
               <Button
-                key={example}
+                key={chip.prompt}
                 type="button"
                 variant="ghost"
                 size="sm"
                 className="border border-dashed border-input"
-                onClick={() => handleExampleClick(example)}
+                onClick={() => handleExampleClick(chip.prompt)}
                 disabled={isLoading}
               >
-                {example}
+                {chip.label}
               </Button>
             ))}
           </div>
