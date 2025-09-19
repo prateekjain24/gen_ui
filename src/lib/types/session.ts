@@ -7,6 +7,8 @@
 
 import type { UXEvent } from './events';
 
+import type { PromptSignals } from '@/lib/prompt-intel/types';
+
 /**
  * User persona types based on behavioral patterns
  * - explorer: Users who skip optional fields and move quickly
@@ -56,6 +58,9 @@ export interface SessionState {
   /** Detected user persona based on behavior */
   persona?: UserPersona;
 
+  /** Latest prompt-derived signals for personalization */
+  promptSignals?: PromptSignals;
+
   /** Queue of UX events for telemetry (max 50) */
   events: UXEvent[];
 
@@ -101,6 +106,9 @@ export interface CreateSessionOptions {
 
   /** Pre-populated values (e.g., from URL params) */
   initialValues?: Record<string, unknown>;
+
+  /** Pre-populated prompt signals (e.g., from cache) */
+  promptSignals?: PromptSignals;
 }
 
 /**
@@ -121,6 +129,9 @@ export interface UpdateSessionOptions {
 
   /** Update detected persona */
   persona?: UserPersona;
+
+  /** Replace prompt signals */
+  promptSignals?: PromptSignals;
 
   /** Add a new event to the queue */
   event?: UXEvent;
@@ -171,6 +182,7 @@ export const createSession = (options: CreateSessionOptions = {}): SessionState 
     currentStep: 'basics', // Start with basics step
     completedSteps: [],
     values: options.initialValues || {},
+    promptSignals: options.promptSignals,
     events: [],
     metadata: options.metadata,
   };

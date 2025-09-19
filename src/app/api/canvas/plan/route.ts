@@ -16,6 +16,10 @@ import {
 } from "@/lib/llm/client";
 import { logCanvasDecision } from "@/lib/llm/eval-logger";
 import { recordLLMUsage } from "@/lib/llm/usage-tracker";
+import { buildPromptSignals, summarizePromptSignals } from "@/lib/prompt-intel";
+import type { PromptSignals } from "@/lib/prompt-intel/types";
+import { sessionStore } from "@/lib/store/session";
+import type { PromptSignalsExtractedEvent } from "@/lib/types/events";
 import { createDebugger, debugError } from "@/lib/utils/debug";
 
 export const runtime = "nodejs";
@@ -31,6 +35,7 @@ const requestSchema = z
     domainEmail: z.string().email().optional(),
     teamSize: z.union([z.string(), z.number()]).optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
+    sessionId: z.string().min(1).optional(),
   })
   .strict();
 
@@ -102,6 +107,7 @@ type CanvasDecisionResponse = {
   confidence: number;
   reasoning: string;
   decisionSource: "llm" | "heuristics";
+  promptSignals: PromptSignals;
 };
 
 const sanitizeReasoning = (value: string): string => {
@@ -326,10 +332,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { message, domainEmail, teamSize, metadata } = parsedBody.data;
+    const { message, domainEmail, teamSize, metadata, sessionId } = parsedBody.data;
     const heuristicsDecision = classifyByHeuristics(message);
 
-    let responsePayload: CanvasDecisionResponse = {
+    let responsePayload: Omit<CanvasDecisionResponse, 'promptSignals'> = {
       recipeId: heuristicsDecision.recipeId,
       persona: heuristicsDecision.persona,
       intentTags: heuristicsDecision.intentTags,
@@ -384,6 +390,30 @@ export async function POST(req: NextRequest) {
 
     const recipeForLog = getRecipe(responsePayload.recipeId);
 
+    const promptSignals = await buildPromptSignals(message);
+    const responsePayloadWithSignals: CanvasDecisionResponse = {
+      ...responsePayload,
+      promptSignals,
+    };
+
+    if (sessionId) {
+      const telemetryEvent: PromptSignalsExtractedEvent = {
+        type: 'prompt_signals_extracted',
+        timestamp: new Date().toISOString(),
+        sessionId,
+        signals: summarizePromptSignals(promptSignals),
+      };
+
+      const updatedSession = sessionStore.updateSession(sessionId, {
+        promptSignals,
+        event: telemetryEvent,
+      });
+
+      if (!updatedSession) {
+        log(`No session found for sessionId ${sessionId}; prompt signals not persisted`);
+      }
+    }
+
     await logCanvasDecision({
       message,
       recipeId: responsePayload.recipeId,
@@ -399,7 +429,7 @@ export async function POST(req: NextRequest) {
       rawDecision: llmResult?.decision ?? null,
     });
 
-    return NextResponse.json(responsePayload);
+    return NextResponse.json(responsePayloadWithSignals);
   } catch (error) {
     debugError("Canvas plan endpoint error", error);
     return NextResponse.json(

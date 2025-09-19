@@ -6,6 +6,7 @@
  */
 
 import { SESSION_CONFIG } from '@/lib/constants';
+import type { PromptSignals } from '@/lib/prompt-intel/types';
 import { UXEvent } from '@/lib/types/events';
 import {
   SessionState,
@@ -171,6 +172,10 @@ class SessionStore {
 
     if (options.persona !== undefined) {
       session.persona = options.persona;
+    }
+
+    if (options.promptSignals !== undefined) {
+      session.promptSignals = options.promptSignals;
     }
 
     if (options.metadata !== undefined) {
@@ -390,6 +395,7 @@ class SessionStore {
       events: [...session.events],
       values: { ...session.values },
       metadata: session.metadata ? { ...session.metadata } : undefined,
+      promptSignals: clonePromptSignals(session.promptSignals),
     }));
   }
 
@@ -416,3 +422,35 @@ export const sessionStore = SessionStore.getInstance();
 
 // Export types for external use
 export type { SessionStoreStats };
+
+function clonePromptSignals(signals?: PromptSignals): PromptSignals | undefined {
+  if (!signals) {
+    return undefined;
+  }
+
+  const entries = Object.entries(signals).map(([key, value]) => [
+    key,
+    {
+      value: deepClone(value.value),
+      metadata: { ...value.metadata },
+    },
+  ] as const);
+
+  return Object.fromEntries(entries) as unknown as PromptSignals;
+}
+
+function deepClone<T>(input: T): T {
+  if (Array.isArray(input)) {
+    return input.map(item => deepClone(item)) as unknown as T;
+  }
+
+  if (input && typeof input === 'object') {
+    const clone: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+      clone[key] = deepClone(value);
+    }
+    return clone as T;
+  }
+
+  return input;
+}

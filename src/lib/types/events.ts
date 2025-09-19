@@ -1,3 +1,4 @@
+import type { PromptSignalSummary } from '@/lib/prompt-intel';
 /**
  * UX Event Type Definitions
  *
@@ -212,6 +213,15 @@ export interface ValidationErrorEvent extends BaseEvent {
  * };
  * ```
  */
+
+/**
+ * Event fired when prompt intelligence extracts signals
+ */
+export interface PromptSignalsExtractedEvent extends BaseEvent {
+  type: 'prompt_signals_extracted';
+  signals: PromptSignalSummary[];
+}
+
 export interface FlowCompleteEvent extends BaseEvent {
   type: 'flow_complete';
   /** Total time to complete in milliseconds */
@@ -299,6 +309,7 @@ export type UXEvent =
   | ValidationErrorEvent
   | FlowCompleteEvent
   | FlowAbandonEvent
+  | PromptSignalsExtractedEvent
   | ErrorEvent
   | CanvasPlanRenderedEvent;
 
@@ -373,6 +384,15 @@ export const isFlowCompleteEvent = (event: UXEvent): event is FlowCompleteEvent 
  */
 export const isFlowAbandonEvent = (event: UXEvent): event is FlowAbandonEvent =>
   event.type === 'flow_abandon';
+
+/**
+ * Type guard to check if an event is a PromptSignalsExtractedEvent
+ * @param event - The event to check
+ * @returns True if the event is a PromptSignalsExtractedEvent
+ */
+export const isPromptSignalsExtractedEvent = (
+  event: UXEvent
+): event is PromptSignalsExtractedEvent => event.type === 'prompt_signals_extracted';
 
 /**
  * Type guard to check if an event is an ErrorEvent
