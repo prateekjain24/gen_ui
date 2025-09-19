@@ -115,6 +115,7 @@ export interface CanvasDecisionLog {
   reasoning: string;
   llmConfidence?: number | null;
   llmRawResponse?: string | null;
+  rawDecision?: unknown;
 }
 
 function resolveCanvasLogDir(): string {

@@ -83,7 +83,7 @@ const llmResponseSchema = z.object({
     .transform(value => (value.length > 160 ? `${value.slice(0, 159)}…` : value)),
 });
 
-const LLM_TIMEOUT_MS = 3_000;
+const LLM_TIMEOUT_MS = 30_000;
 const LLM_RETRY_SETTINGS: BackoffSettings = {
   maxAttempts: 2,
   initialDelay: 150,
@@ -155,7 +155,7 @@ async function classifyWithLLM(
           model: openai(LLM_CONFIG.model),
           system: CANVAS_CLASSIFIER_SYSTEM_PROMPT,
           prompt,
-          maxOutputTokens: 256,
+          maxOutputTokens: 4000,
           abortSignal: signal,
           maxRetries: 0,
         });
@@ -177,7 +177,117 @@ async function classifyWithLLM(
     }
   );
 
-  const normalized = stripCodeFence(result.text ?? "");
+  const rawText = result.text ?? "";
+  const resolvedOutput = (result as { resolvedOutput?: unknown }).resolvedOutput;
+  const toolCalls = (result as { toolCalls?: unknown }).toolCalls;
+  const content = (result as { content?: unknown }).content;
+  const outputText = (result as { outputText?: unknown }).outputText;
+  const responseMessages = (result as { response?: { messages?: unknown } }).response?.messages;
+
+  console.warn("[CanvasClassifier] raw LLM text:", rawText);
+  console.warn("[CanvasClassifier] result snapshot:", {
+    finishReason: (result as { finishReason?: unknown }).finishReason,
+    toolCalls,
+    resolvedOutput,
+    content,
+    outputText,
+    responseMessages,
+  });
+  if (Array.isArray(content)) {
+    console.warn(
+      '[CanvasClassifier] content segments detailed:',
+      content.map(segment => {
+        if (segment && typeof segment === 'object') {
+          return {
+            type: (segment as { type?: unknown }).type,
+            keys: Object.keys(segment as Record<string, unknown>),
+            providerMetadata: (segment as { providerMetadata?: unknown }).providerMetadata,
+          };
+        }
+        return segment;
+      })
+    );
+  }
+
+  let normalized = stripCodeFence(rawText);
+  if (typeof normalized === 'string') {
+    normalized = normalized.trim();
+  }
+
+  if (!normalized && typeof outputText === 'string' && outputText.trim().length > 0) {
+    normalized = stripCodeFence(outputText).trim();
+  }
+
+  if (!normalized && resolvedOutput) {
+    try {
+      normalized = typeof resolvedOutput === 'string' ? resolvedOutput : JSON.stringify(resolvedOutput);
+      normalized = normalized.trim();
+    } catch (error) {
+      debugError('Failed to stringify resolvedOutput', error);
+    }
+  }
+
+  if (!normalized && Array.isArray(content)) {
+    try {
+      const textSegments = content
+        .map(segment => {
+          if (typeof segment === 'string') return segment;
+          if (segment && typeof segment === 'object' && 'text' in segment) {
+            return (segment as { text?: unknown }).text ?? '';
+          }
+          return '';
+        })
+        .join('');
+      normalized = stripCodeFence(String(textSegments)).trim();
+    } catch (error) {
+      debugError('Failed to extract text from content', error);
+    }
+  }
+
+  if (!normalized && Array.isArray(toolCalls) && toolCalls.length > 0) {
+    const firstCall = toolCalls[0] as { args?: unknown };
+    try {
+      const argsValue = firstCall?.args;
+      if (typeof argsValue === 'string') {
+        normalized = argsValue.trim();
+      } else if (argsValue) {
+        normalized = JSON.stringify(argsValue).trim();
+      }
+    } catch (error) {
+      debugError('Failed to stringify tool call args', error);
+    }
+  }
+
+  if (!normalized && Array.isArray(responseMessages)) {
+    try {
+      for (const message of responseMessages) {
+        if (!message || typeof message !== 'object') continue;
+        const msgContent = (message as { content?: unknown }).content;
+        if (!Array.isArray(msgContent)) continue;
+        for (const item of msgContent) {
+          if (!item || typeof item !== 'object') continue;
+          const type = (item as { type?: unknown }).type;
+          if (type === 'output_text' && typeof (item as { text?: unknown }).text === 'string') {
+            normalized = stripCodeFence((item as { text?: string }).text ?? '').trim();
+            if (normalized) break;
+          }
+          if (type === 'tool_call' && typeof (item as { args?: unknown }).args === 'string') {
+            normalized = stripCodeFence((item as { args?: string }).args ?? '').trim();
+            if (normalized) break;
+          }
+          if (type === 'text' && typeof (item as { text?: unknown }).text === 'string') {
+            normalized = stripCodeFence((item as { text?: string }).text ?? '').trim();
+            if (normalized) break;
+          }
+        }
+        if (normalized) break;
+      }
+    } catch (error) {
+      debugError('Failed to extract output text from response messages', error);
+    }
+  }
+
+  console.warn("[CanvasClassifier] normalized text:", normalized);
   if (!normalized) {
     return null;
   }
@@ -186,7 +296,10 @@ async function classifyWithLLM(
   try {
     parsed = JSON.parse(normalized);
   } catch (error) {
-    debugError("Canvas classifier returned invalid JSON", error);
+    debugError("Canvas classifier returned invalid JSON", {
+      error,
+      normalized,
+    });
     return null;
   }
 
@@ -240,6 +353,7 @@ export async function POST(req: NextRequest) {
     if (llmResult) {
       rawLlmResponse = llmResult.rawText;
       llmConfidence = clampConfidence(llmResult.decision.confidence ?? 0);
+      console.warn('[CanvasClassifier] raw response:', rawLlmResponse);
 
       if (llmConfidence >= LLM_CONFIDENCE_THRESHOLD) {
         responsePayload = {
@@ -251,6 +365,15 @@ export async function POST(req: NextRequest) {
           decisionSource: "llm",
         };
       } else {
+        console.warn(
+          '[CanvasClassifier] confidence below threshold',
+          {
+            confidence: llmConfidence,
+            persona: llmResult.decision.persona,
+            recipeId: llmResult.decision.recipe_id,
+            intentTags: llmResult.decision.intent_tags,
+          }
+        );
         log(
           `Canvas classifier confidence ${llmConfidence.toFixed(
             2
@@ -273,6 +396,7 @@ export async function POST(req: NextRequest) {
       componentCount: recipeForLog.fields.length,
       llmConfidence,
       llmRawResponse: rawLlmResponse,
+      rawDecision: llmResult?.decision ?? null,
     });
 
     return NextResponse.json(responsePayload);

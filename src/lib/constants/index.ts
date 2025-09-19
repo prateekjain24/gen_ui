@@ -263,5 +263,5 @@ export const ENV = {
   enableExperimentalComponents: process.env.NEXT_PUBLIC_ENABLE_EXPERIMENTAL_COMPONENTS !== 'false',
 
   /** Enable telemetry capture for Canvas Chat */
-  enableCanvasTelemetry: process.env.NEXT_PUBLIC_ENABLE_CANVAS_TELEMETRY !== 'false',
+  enableCanvasTelemetry: process.env.NEXT_PUBLIC_ENABLE_CANVAS_TELEMETRY === 'true',
 } as const;
