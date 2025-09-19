@@ -1,0 +1,50 @@
+{
+  "id": "explorer-lightweight",
+  "recipeId": "R1",
+  "signals": {
+    "teamSizeBracket": {
+      "value": "solo",
+      "metadata": { "source": "keyword", "confidence": 0.7 }
+    },
+    "decisionMakers": {
+      "value": [],
+      "metadata": { "source": "merge", "confidence": 0.4 }
+    },
+    "approvalChainDepth": {
+      "value": "single",
+      "metadata": { "source": "llm", "confidence": 0.35 }
+    },
+    "tools": {
+      "value": [],
+      "metadata": { "source": "merge", "confidence": 0.3 }
+    },
+    "integrationCriticality": {
+      "value": "unspecified",
+      "metadata": { "source": "merge", "confidence": 0.2 }
+    },
+    "complianceTags": {
+      "value": [],
+      "metadata": { "source": "merge", "confidence": 0.2 }
+    },
+    "copyTone": {
+      "value": "fast-paced",
+      "metadata": { "source": "keyword", "confidence": 0.65 }
+    },
+    "industry": {
+      "value": "saas",
+      "metadata": { "source": "llm", "confidence": 0.5 }
+    },
+    "primaryObjective": {
+      "value": "launch",
+      "metadata": { "source": "llm", "confidence": 0.55 }
+    },
+    "constraints": {
+      "value": { "timeline": "flexible" },
+      "metadata": { "source": "llm", "confidence": 0.4 }
+    },
+    "operatingRegion": {
+      "value": "na",
+      "metadata": { "source": "llm", "confidence": 0.45 }
+    }
+  }
+}

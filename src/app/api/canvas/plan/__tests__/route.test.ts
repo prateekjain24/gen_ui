@@ -78,7 +78,8 @@ describe("POST /api/canvas/plan", () => {
     const response = await POST(createRequest({ message: "Client rollout with Slack" }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    const payload = await response.json();
+    expect(payload).toMatchObject({
       recipeId: "R3",
       persona: "team",
       intentTags: ["client", "integrations"],
@@ -86,6 +87,9 @@ describe("POST /api/canvas/plan", () => {
       reasoning: "Mentioned client stakeholders and integrations",
       decisionSource: "llm",
     });
+    expect(payload.promptSignals).toBeDefined();
+    expect(payload.personalization.fallback).toMatchObject({ applied: true });
+    expect(payload.personalization.overrides).toHaveProperty("integrationMode");
 
     expect(logCanvasDecision).toHaveBeenCalledWith(
       expect.objectContaining({ decisionSource: "llm", recipeId: "R3" })
@@ -102,13 +106,18 @@ describe("POST /api/canvas/plan", () => {
     const response = await POST(createRequest({ message: "Maybe a team space" }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    const payload = await response.json();
+    expect(payload).toMatchObject({
       recipeId: "R2",
       persona: "team",
       intentTags: ["integrations", "invites"],
       confidence: 0.8,
       reasoning: "Team signals detected",
       decisionSource: "heuristics",
+    });
+    expect(payload.personalization.fallback).toMatchObject({
+      applied: true,
+      reasons: expect.arrayContaining(["insufficient_confidence"]),
     });
 
     expect(logCanvasDecision).toHaveBeenCalledWith(
@@ -123,7 +132,8 @@ describe("POST /api/canvas/plan", () => {
     const response = await POST(createRequest({ message: "Need approvals and audit logs" }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    const payload = await response.json();
+    expect(payload).toMatchObject({
       recipeId: "R2",
       persona: "team",
       intentTags: ["integrations", "invites"],
@@ -131,6 +141,8 @@ describe("POST /api/canvas/plan", () => {
       reasoning: "Team signals detected",
       decisionSource: "heuristics",
     });
+    expect(payload.personalization.fallback.applied).toBe(false);
+    expect(payload.personalization.overrides.approvalChainLength.value).toBeGreaterThanOrEqual(1);
   });
 
   it("returns 400 for invalid payload", async () => {
@@ -161,13 +173,18 @@ describe("POST /api/canvas/plan", () => {
     const response = await POST(createRequest({ message: "Need quick notes" }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    const payload = await response.json();
+    expect(payload).toMatchObject({
       recipeId: "R2",
       persona: "team",
       intentTags: ["integrations", "invites"],
       confidence: 0.8,
       reasoning: "Team signals detected",
       decisionSource: "heuristics",
+    });
+    expect(payload.personalization.fallback).toMatchObject({
+      applied: true,
+      reasons: expect.arrayContaining(["insufficient_confidence"]),
     });
     expect(generateText).not.toHaveBeenCalled();
   });

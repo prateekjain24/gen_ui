@@ -1,0 +1,153 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`personalization fixtures matches snapshot for client-portal: client-portal 1`] = `
+{
+  "fallback": {
+    "aggregateConfidence": 0.5916666666666667,
+    "applied": false,
+    "details": [],
+    "reasons": [],
+  },
+  "overrides": {
+    "approvalChainLength": {
+      "changedFromDefault": true,
+      "rationale": "Mapped approval depth 'single' (confidence 0.55) to 0. Raised approvals for compliance-sensitive signals",
+      "value": 2,
+    },
+    "copyTone": {
+      "changedFromDefault": true,
+      "rationale": "Compliance signals found; shifting copy to formal tone",
+      "value": "compliance",
+    },
+    "integrationMode": {
+      "changedFromDefault": true,
+      "rationale": "Compliance or governance signals detected – forcing governed integrations",
+      "value": "governed",
+    },
+    "inviteStrategy": {
+      "changedFromDefault": true,
+      "rationale": "Compliance cues present; staging invites until controls are ready",
+      "value": "staged",
+    },
+    "notificationCadence": {
+      "changedFromDefault": true,
+      "rationale": "Compliance focus detected; escalating to real-time notifications",
+      "value": "real_time",
+    },
+  },
+}
+`;
+
+exports[`personalization fixtures matches snapshot for explorer-lightweight: explorer-lightweight 1`] = `
+{
+  "fallback": {
+    "aggregateConfidence": 0.5833333333333334,
+    "applied": false,
+    "details": [],
+    "reasons": [],
+  },
+  "overrides": {
+    "approvalChainLength": {
+      "changedFromDefault": false,
+      "rationale": "Kept default (0) due to limited high-confidence signals.. Ignored low-confidence approval depth signal (<0.4)",
+      "value": 0,
+    },
+    "copyTone": {
+      "changedFromDefault": false,
+      "rationale": "Kept default ('friendly') due to neutral or low-confidence tone.",
+      "value": "friendly",
+    },
+    "integrationMode": {
+      "changedFromDefault": false,
+      "rationale": "Kept default ('lightweight') with no strong integration signals.",
+      "value": "lightweight",
+    },
+    "inviteStrategy": {
+      "changedFromDefault": false,
+      "rationale": "Solo team detected; delaying invites until user opts in. Kept default ('self_serve') due to insufficient invite signals.",
+      "value": "self_serve",
+    },
+    "notificationCadence": {
+      "changedFromDefault": true,
+      "rationale": "Flexible timeline allows slower notification cadence",
+      "value": "weekly",
+    },
+  },
+}
+`;
+
+exports[`personalization fixtures matches snapshot for governance-lockdown: governance-lockdown 1`] = `
+{
+  "fallback": {
+    "aggregateConfidence": 0.8971428571428571,
+    "applied": false,
+    "details": [],
+    "reasons": [],
+  },
+  "overrides": {
+    "approvalChainLength": {
+      "changedFromDefault": false,
+      "rationale": "Mapped approval depth 'multi' (confidence 0.88) to 2. Raised approvals for compliance-sensitive signals. Kept default (2) due to limited high-confidence signals.",
+      "value": 2,
+    },
+    "copyTone": {
+      "changedFromDefault": false,
+      "rationale": "Kept default ('compliance') due to neutral or low-confidence tone.",
+      "value": "compliance",
+    },
+    "integrationMode": {
+      "changedFromDefault": false,
+      "rationale": "Compliance or governance signals detected – forcing governed integrations. Kept default ('governed') with no strong integration signals.",
+      "value": "governed",
+    },
+    "inviteStrategy": {
+      "changedFromDefault": false,
+      "rationale": "Compliance cues present; staging invites until controls are ready. Kept default ('staged') due to insufficient invite signals.",
+      "value": "staged",
+    },
+    "notificationCadence": {
+      "changedFromDefault": false,
+      "rationale": "Compliance focus detected; escalating to real-time notifications. Kept default ('real_time') due to limited cadence cues.",
+      "value": "real_time",
+    },
+  },
+}
+`;
+
+exports[`personalization fixtures matches snapshot for team-collaboration: team-collaboration 1`] = `
+{
+  "fallback": {
+    "aggregateConfidence": 0.704,
+    "applied": false,
+    "details": [],
+    "reasons": [],
+  },
+  "overrides": {
+    "approvalChainLength": {
+      "changedFromDefault": false,
+      "rationale": "Mapped approval depth 'dual' (confidence 0.68) to 1. Kept default (1) due to limited high-confidence signals.",
+      "value": 1,
+    },
+    "copyTone": {
+      "changedFromDefault": true,
+      "rationale": "Mapped extracted tone 'onboarding' to knob 'friendly'",
+      "value": "friendly",
+    },
+    "integrationMode": {
+      "changedFromDefault": false,
+      "rationale": "Detected Slack and Jira; prioritizing multi-tool integrations. Kept default ('multi_tool') with no strong integration signals.",
+      "value": "multi_tool",
+    },
+    "inviteStrategy": {
+      "changedFromDefault": true,
+      "rationale": "Multiple decision makers detected; using staged invite rollout",
+      "value": "staged",
+    },
+    "notificationCadence": {
+      "changedFromDefault": true,
+      "rationale": "Rush timeline requires real-time notifications",
+      "value": "real_time",
+    },
+  },
+}
+`;

@@ -1,0 +1,54 @@
+{
+  "id": "governance-lockdown",
+  "recipeId": "R4",
+  "signals": {
+    "teamSizeBracket": {
+      "value": "25+",
+      "metadata": { "source": "keyword", "confidence": 0.78 }
+    },
+    "decisionMakers": {
+      "value": [
+        { "role": "Security Lead", "seniority": "director+", "isPrimary": true },
+        { "role": "Compliance Officer", "seniority": "director+", "isPrimary": true },
+        { "role": "IT Admin", "seniority": "manager", "isPrimary": false }
+      ],
+      "metadata": { "source": "llm", "confidence": 0.82 }
+    },
+    "approvalChainDepth": {
+      "value": "multi",
+      "metadata": { "source": "keyword", "confidence": 0.88 }
+    },
+    "tools": {
+      "value": ["Slack", "ServiceNow", "Okta"],
+      "metadata": { "source": "keyword", "confidence": 0.86 }
+    },
+    "integrationCriticality": {
+      "value": "must-have",
+      "metadata": { "source": "keyword", "confidence": 0.84 }
+    },
+    "complianceTags": {
+      "value": ["SOC2", "audit", "SOX"],
+      "metadata": { "source": "keyword", "confidence": 0.92 }
+    },
+    "copyTone": {
+      "value": "meticulous",
+      "metadata": { "source": "llm", "confidence": 0.8 }
+    },
+    "industry": {
+      "value": "public-sector",
+      "metadata": { "source": "llm", "confidence": 0.7 }
+    },
+    "primaryObjective": {
+      "value": "compliance",
+      "metadata": { "source": "llm", "confidence": 0.9 }
+    },
+    "constraints": {
+      "value": { "timeline": "rush", "budget": "premium" },
+      "metadata": { "source": "llm", "confidence": 0.72 }
+    },
+    "operatingRegion": {
+      "value": "global",
+      "metadata": { "source": "llm", "confidence": 0.65 }
+    }
+  }
+}

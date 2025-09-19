@@ -596,8 +596,12 @@ function detectConflicts(signals: PromptSignals): ConflictDescriptor[] {
 
   const complianceConfidence = Math.max(
     signals.complianceTags.metadata.confidence ?? 0,
-    signals.primaryObjective.metadata.confidence ?? 0,
-    signals.approvalChainDepth.metadata.confidence ?? 0
+    signals.primaryObjective.value === "compliance"
+      ? signals.primaryObjective.metadata.confidence ?? 0
+      : 0,
+    signals.approvalChainDepth.value === "multi"
+      ? signals.approvalChainDepth.metadata.confidence ?? 0
+      : 0
   );
 
   const toneConflict = isComplianceToneConflict(signals.copyTone.value, signals.copyTone.metadata.confidence);

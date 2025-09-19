@@ -1,0 +1,53 @@
+{
+  "id": "team-collaboration",
+  "recipeId": "R2",
+  "signals": {
+    "teamSizeBracket": {
+      "value": "10-24",
+      "metadata": { "source": "keyword", "confidence": 0.85 }
+    },
+    "decisionMakers": {
+      "value": [
+        { "role": "Product Manager", "seniority": "manager", "isPrimary": true },
+        { "role": "Engineering Lead", "seniority": "manager", "isPrimary": true }
+      ],
+      "metadata": { "source": "llm", "confidence": 0.72 }
+    },
+    "approvalChainDepth": {
+      "value": "dual",
+      "metadata": { "source": "llm", "confidence": 0.68 }
+    },
+    "tools": {
+      "value": ["Slack", "Jira", "Notion"],
+      "metadata": { "source": "keyword", "confidence": 0.92 }
+    },
+    "integrationCriticality": {
+      "value": "must-have",
+      "metadata": { "source": "llm", "confidence": 0.75 }
+    },
+    "complianceTags": {
+      "value": [],
+      "metadata": { "source": "merge", "confidence": 0.2 }
+    },
+    "copyTone": {
+      "value": "onboarding",
+      "metadata": { "source": "llm", "confidence": 0.6 }
+    },
+    "industry": {
+      "value": "saas",
+      "metadata": { "source": "llm", "confidence": 0.5 }
+    },
+    "primaryObjective": {
+      "value": "scale",
+      "metadata": { "source": "llm", "confidence": 0.55 }
+    },
+    "constraints": {
+      "value": { "timeline": "rush", "budget": "standard" },
+      "metadata": { "source": "llm", "confidence": 0.6 }
+    },
+    "operatingRegion": {
+      "value": "na",
+      "metadata": { "source": "llm", "confidence": 0.5 }
+    }
+  }
+}

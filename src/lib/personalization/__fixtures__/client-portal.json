@@ -1,0 +1,52 @@
+{
+  "id": "client-portal",
+  "recipeId": "R3",
+  "signals": {
+    "teamSizeBracket": {
+      "value": "1-9",
+      "metadata": { "source": "keyword", "confidence": 0.65 }
+    },
+    "decisionMakers": {
+      "value": [
+        { "role": "Account Director", "seniority": "director+", "isPrimary": true }
+      ],
+      "metadata": { "source": "llm", "confidence": 0.6 }
+    },
+    "approvalChainDepth": {
+      "value": "single",
+      "metadata": { "source": "llm", "confidence": 0.55 }
+    },
+    "tools": {
+      "value": ["Slack", "Google Drive", "Asana"],
+      "metadata": { "source": "keyword", "confidence": 0.8 }
+    },
+    "integrationCriticality": {
+      "value": "nice-to-have",
+      "metadata": { "source": "llm", "confidence": 0.45 }
+    },
+    "complianceTags": {
+      "value": ["regulated-industry"],
+      "metadata": { "source": "keyword", "confidence": 0.6 }
+    },
+    "copyTone": {
+      "value": "trusted-advisor",
+      "metadata": { "source": "llm", "confidence": 0.58 }
+    },
+    "industry": {
+      "value": "fintech",
+      "metadata": { "source": "llm", "confidence": 0.62 }
+    },
+    "primaryObjective": {
+      "value": "launch",
+      "metadata": { "source": "llm", "confidence": 0.6 }
+    },
+    "constraints": {
+      "value": { "timeline": "standard" },
+      "metadata": { "source": "llm", "confidence": 0.45 }
+    },
+    "operatingRegion": {
+      "value": "emea",
+      "metadata": { "source": "llm", "confidence": 0.5 }
+    }
+  }
+}
