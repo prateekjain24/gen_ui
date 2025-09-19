@@ -114,6 +114,17 @@ const errorEventSchema = z.object({
   ...baseEventShape,
 });
 
+const canvasPlanRenderedEventSchema = z.object({
+  type: z.literal('canvas_plan_rendered'),
+  recipeId: z.enum(['R1', 'R2', 'R3', 'R4']),
+  persona: z.enum(['explorer', 'team', 'power']),
+  componentCount: z.number().int().nonnegative(),
+  decisionSource: z.enum(['llm', 'heuristics']),
+  intentTags: z.array(z.string()).max(10).default([]),
+  confidence: z.number().min(0).max(1),
+  ...baseEventShape,
+});
+
 const eventSchema = z.discriminatedUnion('type', [
   fieldFocusEventSchema,
   fieldBlurEventSchema,
@@ -125,6 +136,7 @@ const eventSchema = z.discriminatedUnion('type', [
   flowCompleteEventSchema,
   flowAbandonEventSchema,
   errorEventSchema,
+  canvasPlanRenderedEventSchema,
 ]);
 
 const EventBatchSchema = z.object({

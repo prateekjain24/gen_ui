@@ -3,17 +3,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { classifyByHeuristics } from "@/lib/canvas/heuristics";
-import { logCanvasDecision } from "@/lib/canvas/logger";
 import { CANVAS_CLASSIFIER_SYSTEM_PROMPT, buildCanvasClassifierPrompt } from "@/lib/canvas/prompt";
 import type { CanvasRecipeId } from "@/lib/canvas/recipes";
+import { getRecipe } from "@/lib/canvas/recipes";
 import { LLM_CONFIG } from "@/lib/constants";
 import {
   getOpenAIProvider,
   invokeWithTimeout,
   retryWithExponentialBackoff,
   shouldRetryOnError,
+  type BackoffSettings,
 } from "@/lib/llm/client";
-import type { BackoffSettings } from "@/lib/llm/client";
+import { logCanvasDecision } from "@/lib/llm/eval-logger";
 import { recordLLMUsage } from "@/lib/llm/usage-tracker";
 import { createDebugger, debugError } from "@/lib/utils/debug";
 
@@ -258,6 +259,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const recipeForLog = getRecipe(responsePayload.recipeId);
+
     await logCanvasDecision({
       message,
       recipeId: responsePayload.recipeId,
@@ -267,6 +270,7 @@ export async function POST(req: NextRequest) {
       reasoning: responsePayload.reasoning,
       decisionSource: responsePayload.decisionSource,
       fallbackUsed: responsePayload.decisionSource !== "llm",
+      componentCount: recipeForLog.fields.length,
       llmConfidence,
       llmRawResponse: rawLlmResponse,
     });

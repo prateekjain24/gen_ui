@@ -11,7 +11,7 @@ jest.mock("@/lib/canvas/heuristics", () => ({
   classifyByHeuristics: jest.fn(),
 }));
 
-jest.mock("@/lib/canvas/logger", () => ({
+jest.mock("@/lib/llm/eval-logger", () => ({
   logCanvasDecision: jest.fn(async () => undefined),
 }));
 
@@ -35,13 +35,13 @@ jest.mock("@/lib/llm/usage-tracker", () => ({
 describe("POST /api/canvas/plan", () => {
   type GenerateTextType = typeof import("ai").generateText;
   type HeuristicsType = typeof import("@/lib/canvas/heuristics").classifyByHeuristics;
-  type LogCanvasDecisionType = typeof import("@/lib/canvas/logger").logCanvasDecision;
+  type LogCanvasDecisionType = typeof import("@/lib/llm/eval-logger").logCanvasDecision;
 
   const generateText = generateTextMock as jest.MockedFunction<GenerateTextType>;
   const { classifyByHeuristics } = jest.requireMock("@/lib/canvas/heuristics") as {
     classifyByHeuristics: jest.MockedFunction<HeuristicsType>;
   };
-  const { logCanvasDecision } = jest.requireMock("@/lib/canvas/logger") as {
+  const { logCanvasDecision } = jest.requireMock("@/lib/llm/eval-logger") as {
     logCanvasDecision: jest.MockedFunction<LogCanvasDecisionType>;
   };
 

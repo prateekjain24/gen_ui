@@ -249,6 +249,19 @@ export interface FlowAbandonEvent extends BaseEvent {
 }
 
 /**
+ * Event fired when Canvas Chat renders a plan tile
+ */
+export interface CanvasPlanRenderedEvent extends BaseEvent {
+  type: 'canvas_plan_rendered';
+  recipeId: 'R1' | 'R2' | 'R3' | 'R4';
+  persona: 'explorer' | 'team' | 'power';
+  componentCount: number;
+  decisionSource: 'llm' | 'heuristics';
+  intentTags: string[];
+  confidence: number;
+}
+
+/**
  * Event fired when an error occurs
  * @example
  * ```typescript
@@ -286,7 +299,8 @@ export type UXEvent =
   | ValidationErrorEvent
   | FlowCompleteEvent
   | FlowAbandonEvent
-  | ErrorEvent;
+  | ErrorEvent
+  | CanvasPlanRenderedEvent;
 
 /**
  * Type guard to check if an event is a FieldFocusEvent
@@ -367,6 +381,14 @@ export const isFlowAbandonEvent = (event: UXEvent): event is FlowAbandonEvent =>
  */
 export const isErrorEvent = (event: UXEvent): event is ErrorEvent =>
   event.type === 'error';
+
+/**
+ * Type guard to check if an event is a CanvasPlanRenderedEvent
+ * @param event - The event to check
+ * @returns True if the event is a CanvasPlanRenderedEvent
+ */
+export const isCanvasPlanRenderedEvent = (event: UXEvent): event is CanvasPlanRenderedEvent =>
+  event.type === 'canvas_plan_rendered';
 
 /**
  * Helper function to create a timestamp for events

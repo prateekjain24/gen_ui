@@ -56,6 +56,7 @@ Phase 3 requires components that make LLM-authored screens feel distinct from th
 - Emit `component_kind` and `is_ai_component` when LLM response includes new kinds.
 - Eval logger to compute `ai_component_count` metric.
 - Add screenshot fixtures demonstrating Explorer vs Team palettes.
+- Canvas Chat emits `canvas_plan_rendered` telemetry events capturing recipe, persona, confidence, decision source, and component counts, and logs matching records to `eval/logs/canvas/*.jsonl` for downstream analysis.
 
 ## Implementation Checklist
 1. Update constants (`FIELD_IDS`, `FIELD_ID_SET`) and create mappings for new ids.

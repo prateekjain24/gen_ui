@@ -261,4 +261,7 @@ export const ENV = {
 
   /** Enable experimental AI-driven components */
   enableExperimentalComponents: process.env.NEXT_PUBLIC_ENABLE_EXPERIMENTAL_COMPONENTS !== 'false',
+
+  /** Enable telemetry capture for Canvas Chat */
+  enableCanvasTelemetry: process.env.NEXT_PUBLIC_ENABLE_CANVAS_TELEMETRY !== 'false',
 } as const;

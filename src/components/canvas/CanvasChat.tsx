@@ -12,6 +12,7 @@ import { useStaggeredMount } from "@/hooks/useStaggeredMount";
 import type { CanvasRecipe, CanvasRecipeId } from "@/lib/canvas/recipes";
 import { getRecipe } from "@/lib/canvas/recipes";
 import { ENV } from "@/lib/constants";
+import { createTelemetryQueue, type TelemetryQueue } from "@/lib/telemetry/events";
 import type { Field, FormPlan, StepperItem } from "@/lib/types/form";
 import { cn } from "@/lib/utils";
 
@@ -115,7 +116,37 @@ export function CanvasChat(): React.ReactElement {
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [animationKey, setAnimationKey] = React.useState(0);
+  const telemetryQueueRef = React.useRef<TelemetryQueue | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const [telemetrySessionId] = React.useState(() => {
+    if (typeof window === "undefined") {
+      return "canvas-telemetry-ssr";
+    }
+    const storageKey = "canvasTelemetrySessionId";
+    const existing = window.sessionStorage.getItem(storageKey);
+    if (existing) {
+      return existing;
+    }
+    const generated = `canvas-${window.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
+    window.sessionStorage.setItem(storageKey, generated);
+    return generated;
+  });
+
+  React.useEffect(() => {
+    if (!ENV.enableCanvasTelemetry || typeof window === "undefined") {
+      telemetryQueueRef.current = null;
+      return;
+    }
+
+    const queue = createTelemetryQueue(telemetrySessionId);
+    telemetryQueueRef.current = queue;
+
+    return () => {
+      telemetryQueueRef.current = null;
+      void queue.dispose();
+    };
+  }, [telemetrySessionId]);
 
   const submitMessage = React.useCallback(
     async (value: string) => {
@@ -202,6 +233,22 @@ export function CanvasChat(): React.ReactElement {
   });
 
   const enableExperimentalComponents = ENV.enableExperimentalComponents;
+
+  React.useEffect(() => {
+    if (!plan || !ENV.enableCanvasTelemetry) {
+      return;
+    }
+
+    telemetryQueueRef.current?.enqueue({
+      type: "canvas_plan_rendered",
+      recipeId: plan.recipeId,
+      persona: plan.persona,
+      componentCount: plan.fields.length,
+      decisionSource: plan.decisionSource,
+      intentTags: plan.intentTags,
+      confidence: plan.confidence,
+    });
+  }, [plan]);
 
   return (
     <main className="flex min-h-screen flex-col bg-background">

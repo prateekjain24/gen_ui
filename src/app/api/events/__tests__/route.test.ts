@@ -150,4 +150,32 @@ describe('POST /api/events', () => {
     expect(addedBatch).toHaveLength(SESSION_CONFIG.MAX_EVENTS_PER_SESSION);
     expect(analyzeEvents).toHaveBeenCalledWith(addedBatch);
   });
+
+  it('accepts canvas plan rendered events', async () => {
+    const session = createSession();
+    sessionStore.getSession.mockReturnValue(session);
+    sessionStore.addEvents.mockReturnValue(1);
+    analyzeEvents.mockReturnValue({ totalEvents: 1 });
+
+    const canvasEvent = {
+      type: 'canvas_plan_rendered' as const,
+      recipeId: 'R3',
+      persona: 'team',
+      componentCount: 5,
+      decisionSource: 'llm' as const,
+      intentTags: ['client'],
+      confidence: 0.8,
+      timestamp: new Date().toISOString(),
+    };
+
+    const req = createMockRequest({
+      sessionId: session.id,
+      events: [canvasEvent],
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    const addedBatch = sessionStore.addEvents.mock.calls[0][1];
+    expect(addedBatch[0]).toMatchObject({ type: 'canvas_plan_rendered', recipeId: 'R3' });
+  });
 });
