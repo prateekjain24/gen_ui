@@ -3,7 +3,7 @@
 import { Loader2 } from "lucide-react";
 import * as React from "react";
 
-import { PersonaBadge, ReasoningChip } from "@/components/canvas";
+import { PersonaBadge, PromptSignalsDebugPanel, ReasoningChip } from "@/components/canvas";
 import { FormRenderer } from "@/components/form/FormRenderer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { canvasCopy } from "@/lib/canvas/copy";
 import type { CanvasRecipe, CanvasRecipeId } from "@/lib/canvas/recipes";
 import { getRecipe } from "@/lib/canvas/recipes";
 import { ENV } from "@/lib/constants";
+import type { PromptSignals } from "@/lib/prompt-intel/types";
 import { createTelemetryQueue, type TelemetryQueue } from "@/lib/telemetry/events";
 import type { Field, FormPlan, StepperItem } from "@/lib/types/form";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,7 @@ interface CanvasPlanResponse {
   confidence: number;
   reasoning: string;
   decisionSource: CanvasDecisionSource;
+  promptSignals: PromptSignals;
 }
 
 interface CanvasPlanState extends CanvasPlanResponse {
@@ -114,22 +116,16 @@ export function CanvasChat(): React.ReactElement {
   const telemetryQueueRef = React.useRef<TelemetryQueue | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
-  const [telemetrySessionId] = React.useState(() => {
+  const [telemetrySessionId, setTelemetrySessionId] = React.useState<string | null>(() => {
     if (typeof window === "undefined") {
-      return "canvas-telemetry-ssr";
+      return null;
     }
     const storageKey = "canvasTelemetrySessionId";
-    const existing = window.sessionStorage.getItem(storageKey);
-    if (existing) {
-      return existing;
-    }
-    const generated = `canvas-${window.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
-    window.sessionStorage.setItem(storageKey, generated);
-    return generated;
+    return window.sessionStorage.getItem(storageKey);
   });
 
   React.useEffect(() => {
-    if (!ENV.enableCanvasTelemetry || typeof window === "undefined") {
+    if (!ENV.enableCanvasTelemetry || typeof window === "undefined" || !telemetrySessionId) {
       telemetryQueueRef.current = null;
       return;
     }
@@ -140,6 +136,51 @@ export function CanvasChat(): React.ReactElement {
     return () => {
       telemetryQueueRef.current = null;
       void queue.dispose();
+    };
+  }, [telemetrySessionId]);
+
+  React.useEffect(() => {
+    if (!ENV.enableCanvasTelemetry || typeof window === "undefined") {
+      return;
+    }
+
+    const storageKey = "canvasTelemetrySessionId";
+    if (telemetrySessionId) {
+      window.sessionStorage.setItem(storageKey, telemetrySessionId);
+      return;
+    }
+
+    let isMounted = true;
+    const controller = new AbortController();
+
+    const bootstrapSession = async () => {
+      try {
+        const response = await fetch("/api/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ metadata: { source: "canvas-chat" } }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to create telemetry session");
+        }
+
+        const data = (await response.json()) as { sessionId?: string };
+        if (data.sessionId && isMounted) {
+          window.sessionStorage.setItem(storageKey, data.sessionId);
+          setTelemetrySessionId(data.sessionId);
+        }
+      } catch (sessionError) {
+        console.error("Canvas telemetry session bootstrap failed", sessionError);
+      }
+    };
+
+    void bootstrapSession();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
     };
   }, [telemetrySessionId]);
 
@@ -158,7 +199,11 @@ export function CanvasChat(): React.ReactElement {
         const response = await fetch("/api/canvas/plan", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: trimmed }),
+          body: JSON.stringify({
+            message: trimmed,
+            sessionId:
+              ENV.enableCanvasTelemetry && telemetrySessionId ? telemetrySessionId : undefined,
+          }),
         });
 
         if (!response.ok) {
@@ -187,7 +232,7 @@ export function CanvasChat(): React.ReactElement {
         setIsLoading(false);
       }
     },
-    []
+    [telemetrySessionId]
   );
 
   const handleSubmit = React.useCallback(
@@ -381,6 +426,10 @@ export function CanvasChat(): React.ReactElement {
               <Card className="border border-border/60 p-4">
                 <FormRenderer key={`${plan.recipeId}-${animationKey}`} plan={plan.formPlan} />
               </Card>
+
+              {ENV.isDebug ? (
+                <PromptSignalsDebugPanel signals={plan.promptSignals} />
+              ) : null}
             </div>
           ) : null}
         </section>

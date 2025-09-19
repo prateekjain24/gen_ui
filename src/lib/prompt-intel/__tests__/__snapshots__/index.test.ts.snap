@@ -1,0 +1,475 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`prompt fixtures produces stable signals for {\\n  id: 'global-saas',\\n  prompt: "We're scaling a 22-person RevOps org across North America and APAC. Legal and finance leads must approve every launch. Need Salesforce and Slack automation, SOC2 ready messaging, and onboarding tone that's meticulous but still upbeat.",\\n  llm: [Object]\\n}: global-saas 1`] = `
+{
+  "approvalChainDepth": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "unknown",
+  },
+  "complianceTags": {
+    "metadata": {
+      "confidence": 1,
+      "notes": "keywords: SOC2 (soc2)",
+      "source": "keyword",
+    },
+    "value": [
+      "SOC2",
+    ],
+  },
+  "constraints": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": {},
+  },
+  "copyTone": {
+    "metadata": {
+      "confidence": 1,
+      "notes": "keyword: meticulous",
+      "source": "keyword",
+    },
+    "value": "meticulous",
+  },
+  "decisionMakers": {
+    "metadata": {
+      "confidence": 0.86,
+      "source": "llm",
+    },
+    "value": [
+      {
+        "isPrimary": true,
+        "role": "Head of Legal",
+        "seniority": "director+",
+      },
+      {
+        "isPrimary": true,
+        "role": "VP Finance",
+        "seniority": "director+",
+      },
+    ],
+  },
+  "industry": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "other",
+  },
+  "integrationCriticality": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "unspecified",
+  },
+  "operatingRegion": {
+    "metadata": {
+      "confidence": 0.8,
+      "source": "llm",
+    },
+    "value": "global",
+  },
+  "primaryObjective": {
+    "metadata": {
+      "confidence": 0.74,
+      "source": "llm",
+    },
+    "value": "scale",
+  },
+  "teamSizeBracket": {
+    "metadata": {
+      "confidence": 1,
+      "notes": "matched explicit headcount "22-person"",
+      "source": "keyword",
+    },
+    "value": "10-24",
+  },
+  "tools": {
+    "metadata": {
+      "confidence": 1,
+      "notes": "keywords: Slack (slack), Salesforce (salesforce)",
+      "source": "keyword",
+    },
+    "value": [
+      "Slack",
+      "Salesforce",
+    ],
+  },
+}
+`;
+
+exports[`prompt fixtures produces stable signals for {\\n  id: 'multilingual-expansion',\\n  prompt: 'Somos un equipo de 8 personas en Madrid preparando migración a Zendesk y Slack. Urgente: listo antes del onboarding de partners en EMEA. Necesitamos tono energético y notas sobre presupuesto ajustado.',\\n  llm: [Object]\\n}: multilingual-expansion 1`] = `
+{
+  "approvalChainDepth": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "unknown",
+  },
+  "complianceTags": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": [],
+  },
+  "constraints": {
+    "metadata": {
+      "confidence": 0.72,
+      "source": "llm",
+    },
+    "value": {
+      "budget": "tight",
+      "notes": "Onboarding partners in EMEA",
+      "timeline": "rush",
+    },
+  },
+  "copyTone": {
+    "metadata": {
+      "confidence": 0.76,
+      "notes": "LLM override of keyword value | keyword: onboarding",
+      "source": "llm",
+    },
+    "value": "fast-paced",
+  },
+  "decisionMakers": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": [],
+  },
+  "industry": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "other",
+  },
+  "integrationCriticality": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "unspecified",
+  },
+  "operatingRegion": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "unspecified",
+  },
+  "primaryObjective": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "other",
+  },
+  "teamSizeBracket": {
+    "metadata": {
+      "confidence": 1,
+      "notes": "Keyword and LLM agreement | matched numeric headcount "8"",
+      "source": "merge",
+    },
+    "value": "1-9",
+  },
+  "tools": {
+    "metadata": {
+      "confidence": 1,
+      "notes": "keywords: Slack (slack), Zendesk (zendesk)",
+      "source": "keyword",
+    },
+    "value": [
+      "Slack",
+      "Zendesk",
+    ],
+  },
+}
+`;
+
+exports[`prompt fixtures produces stable signals for {\\n  id: 'partial-sentence-brief',\\n  prompt: '40-person onboarding crew. migrating support flows to ServiceNow. HIPAA, audit logging mandatory. migration tone = trusted advisor.',\\n  llm: [Object]\\n}: partial-sentence-brief 1`] = `
+{
+  "approvalChainDepth": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "unknown",
+  },
+  "complianceTags": {
+    "metadata": {
+      "confidence": 1,
+      "notes": "keywords: HIPAA (hipaa), audit (audit)",
+      "source": "keyword",
+    },
+    "value": [
+      "HIPAA",
+      "audit",
+    ],
+  },
+  "constraints": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": {},
+  },
+  "copyTone": {
+    "metadata": {
+      "confidence": 1,
+      "notes": "keyword: trusted advisor",
+      "source": "keyword",
+    },
+    "value": "trusted-advisor",
+  },
+  "decisionMakers": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": [],
+  },
+  "industry": {
+    "metadata": {
+      "confidence": 0.82,
+      "source": "llm",
+    },
+    "value": "healthcare",
+  },
+  "integrationCriticality": {
+    "metadata": {
+      "confidence": 0.7,
+      "source": "llm",
+    },
+    "value": "must-have",
+  },
+  "operatingRegion": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "unspecified",
+  },
+  "primaryObjective": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "other",
+  },
+  "teamSizeBracket": {
+    "metadata": {
+      "confidence": 1,
+      "notes": "matched explicit headcount "40-person"",
+      "source": "keyword",
+    },
+    "value": "25+",
+  },
+  "tools": {
+    "metadata": {
+      "confidence": 1,
+      "notes": "keywords: ServiceNow (servicenow)",
+      "source": "keyword",
+    },
+    "value": [
+      "ServiceNow",
+    ],
+  },
+}
+`;
+
+exports[`prompt fixtures produces stable signals for {\\n  id: 'regulated-healthcare',\\n  prompt: 'Need meticulous patient onboarding for a 65-person clinical ops team. Must satisfy HIPAA, ISO27001, and internal audit checkpoints. Tools in scope: Notion for templates, Slack alerts, and Zendesk escalations. Stakeholder: Chief Compliance Officer signs off solo.',\\n  llm: [Object]\\n}: regulated-healthcare 1`] = `
+{
+  "approvalChainDepth": {
+    "metadata": {
+      "confidence": 0.68,
+      "source": "llm",
+    },
+    "value": "single",
+  },
+  "complianceTags": {
+    "metadata": {
+      "confidence": 1,
+      "notes": "keywords: HIPAA (hipaa), ISO27001 (iso27001), audit (audit)",
+      "source": "keyword",
+    },
+    "value": [
+      "HIPAA",
+      "ISO27001",
+      "audit",
+    ],
+  },
+  "constraints": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": {},
+  },
+  "copyTone": {
+    "metadata": {
+      "confidence": 1,
+      "notes": "keyword: meticulous",
+      "source": "keyword",
+    },
+    "value": "meticulous",
+  },
+  "decisionMakers": {
+    "metadata": {
+      "confidence": 0.83,
+      "source": "llm",
+    },
+    "value": [
+      {
+        "isPrimary": true,
+        "role": "Chief Compliance Officer",
+        "seniority": "director+",
+      },
+    ],
+  },
+  "industry": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "other",
+  },
+  "integrationCriticality": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "unspecified",
+  },
+  "operatingRegion": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "unspecified",
+  },
+  "primaryObjective": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "other",
+  },
+  "teamSizeBracket": {
+    "metadata": {
+      "confidence": 1,
+      "notes": "keyword: solo",
+      "source": "keyword",
+    },
+    "value": "solo",
+  },
+  "tools": {
+    "metadata": {
+      "confidence": 1,
+      "notes": "keywords: Slack (slack), Notion (notion), Zendesk (zendesk)",
+      "source": "keyword",
+    },
+    "value": [
+      "Slack",
+      "Notion",
+      "Zendesk",
+    ],
+  },
+}
+`;
+
+exports[`prompt fixtures produces stable signals for {\\n  id: 'tooling-overlap',\\n  prompt: 'Solo founder sprinting on a pilot. Mentions: Slack standups, slack huddles, Jira automations, jira roadmaps, Notion docs. Needs calm onboarding tone, nothing salesy.',\\n  llm: [Object]\\n}: tooling-overlap 1`] = `
+{
+  "approvalChainDepth": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "unknown",
+  },
+  "complianceTags": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": [],
+  },
+  "constraints": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": {},
+  },
+  "copyTone": {
+    "metadata": {
+      "confidence": 1,
+      "notes": "Keyword preferred over lower-confidence LLM | keyword: onboarding",
+      "source": "keyword",
+    },
+    "value": "onboarding",
+  },
+  "decisionMakers": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": [],
+  },
+  "industry": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "other",
+  },
+  "integrationCriticality": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "unspecified",
+  },
+  "operatingRegion": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "unspecified",
+  },
+  "primaryObjective": {
+    "metadata": {
+      "confidence": 0,
+      "source": "merge",
+    },
+    "value": "other",
+  },
+  "teamSizeBracket": {
+    "metadata": {
+      "confidence": 1,
+      "notes": "keyword: solo",
+      "source": "keyword",
+    },
+    "value": "solo",
+  },
+  "tools": {
+    "metadata": {
+      "confidence": 1,
+      "notes": "keywords: Slack (slack), Jira (jira), Notion (notion)",
+      "source": "keyword",
+    },
+    "value": [
+      "Slack",
+      "Jira",
+      "Notion",
+    ],
+  },
+}
+`;

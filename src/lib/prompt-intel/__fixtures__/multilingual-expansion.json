@@ -1,0 +1,18 @@
+{
+  "id": "multilingual-expansion",
+  "prompt": "Somos un equipo de 8 personas en Madrid preparando migración a Zendesk y Slack. Urgente: listo antes del onboarding de partners en EMEA. Necesitamos tono energético y notas sobre presupuesto ajustado.",
+  "llm": {
+    "teamSizeBracket": {
+      "value": "1-9",
+      "metadata": { "source": "llm", "confidence": 0.78 }
+    },
+    "constraints": {
+      "value": { "timeline": "rush", "budget": "tight", "notes": "Onboarding partners in EMEA" },
+      "metadata": { "source": "llm", "confidence": 0.72 }
+    },
+    "copyTone": {
+      "value": "fast-paced",
+      "metadata": { "source": "llm", "confidence": 0.76 }
+    }
+  }
+}

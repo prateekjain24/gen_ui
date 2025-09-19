@@ -1,3 +1,4 @@
+import fixtures from '../__fixtures__';
 import { buildPromptSignals, summarizePromptSignals } from '../index';
 import { extractSignalsFromKeywords } from '../keyword-extractor';
 
@@ -101,5 +102,17 @@ describe('buildPromptSignals', () => {
     const complianceSummary = summary.find(item => item.key === 'complianceTags');
     expect(complianceSummary?.source).toBe('merge');
     expect(complianceSummary?.confidence).toBeGreaterThan(0.6);
+  });
+});
+
+describe('prompt fixtures', () => {
+  it.each(fixtures)("produces stable signals for %s", async fixture => {
+    fetchSignalsFromLLM.mockReset();
+    fetchSignalsFromLLM.mockResolvedValueOnce(fixture.llm ?? {});
+
+    const result = await buildPromptSignals(fixture.prompt);
+    const serializable = JSON.parse(JSON.stringify(result));
+
+    expect(serializable).toMatchSnapshot(fixture.id);
   });
 });

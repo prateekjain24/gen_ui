@@ -1,0 +1,10 @@
+{
+  "id": "tooling-overlap",
+  "prompt": "Solo founder sprinting on a pilot. Mentions: Slack standups, slack huddles, Jira automations, jira roadmaps, Notion docs. Needs calm onboarding tone, nothing salesy.",
+  "llm": {
+    "copyTone": {
+      "value": "trusted-advisor",
+      "metadata": { "source": "llm", "confidence": 0.6 }
+    }
+  }
+}

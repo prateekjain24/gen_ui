@@ -1,0 +1,21 @@
+{
+  "id": "global-saas",
+  "prompt": "We're scaling a 22-person RevOps org across North America and APAC. Legal and finance leads must approve every launch. Need Salesforce and Slack automation, SOC2 ready messaging, and onboarding tone that's meticulous but still upbeat.",
+  "llm": {
+    "decisionMakers": {
+      "value": [
+        { "role": "Head of Legal", "seniority": "director+", "isPrimary": true },
+        { "role": "VP Finance", "seniority": "director+", "isPrimary": true }
+      ],
+      "metadata": { "source": "llm", "confidence": 0.86 }
+    },
+    "operatingRegion": {
+      "value": "global",
+      "metadata": { "source": "llm", "confidence": 0.8 }
+    },
+    "primaryObjective": {
+      "value": "scale",
+      "metadata": { "source": "llm", "confidence": 0.74 }
+    }
+  }
+}

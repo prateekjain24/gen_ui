@@ -1,0 +1,16 @@
+{
+  "id": "regulated-healthcare",
+  "prompt": "Need meticulous patient onboarding for a 65-person clinical ops team. Must satisfy HIPAA, ISO27001, and internal audit checkpoints. Tools in scope: Notion for templates, Slack alerts, and Zendesk escalations. Stakeholder: Chief Compliance Officer signs off solo.",
+  "llm": {
+    "approvalChainDepth": {
+      "value": "single",
+      "metadata": { "source": "llm", "confidence": 0.68 }
+    },
+    "decisionMakers": {
+      "value": [
+        { "role": "Chief Compliance Officer", "seniority": "director+", "isPrimary": true }
+      ],
+      "metadata": { "source": "llm", "confidence": 0.83 }
+    }
+  }
+}

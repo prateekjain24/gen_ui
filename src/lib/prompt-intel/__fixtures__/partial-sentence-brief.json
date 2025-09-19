@@ -1,0 +1,14 @@
+{
+  "id": "partial-sentence-brief",
+  "prompt": "40-person onboarding crew. migrating support flows to ServiceNow. HIPAA, audit logging mandatory. migration tone = trusted advisor.",
+  "llm": {
+    "integrationCriticality": {
+      "value": "must-have",
+      "metadata": { "source": "llm", "confidence": 0.7 }
+    },
+    "industry": {
+      "value": "healthcare",
+      "metadata": { "source": "llm", "confidence": 0.82 }
+    }
+  }
+}
