@@ -18,10 +18,15 @@ import { ENV } from "@/lib/constants";
 import { FIELD_IDS } from "@/lib/constants/fields";
 import type { RecipeKnobOverrides, RecipePersonalizationResult } from "@/lib/personalization/scoring";
 import { formatSignalValue, SIGNAL_LABEL_MAP } from "@/lib/prompt-intel/format";
-import type { PromptSignals } from "@/lib/prompt-intel/types";
+import type {
+  ApprovalChainDepth,
+  PromptSignals,
+  TeamSizeBracket,
+  ToolIdentifier,
+} from "@/lib/prompt-intel/types";
 import { createTelemetryQueue, type TelemetryQueue } from "@/lib/telemetry/events";
 import type { AIAttribution, AIAttributionSignal } from "@/lib/types/ai";
-import type { Field, FormPlan, StepperItem } from "@/lib/types/form";
+import type { Field, FieldOption, FormPlan, IntegrationPickerField, StepperItem } from "@/lib/types/form";
 import { cn } from "@/lib/utils";
 
 type CanvasDecisionSource = "llm" | "heuristics";
@@ -118,6 +123,67 @@ const KNOB_SIGNAL_KEYS: Partial<Record<RecipeKnobId, Array<keyof PromptSignals>>
 };
 
 const MAX_FALLBACK_DETAILS = 3;
+
+const slugify = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const toolToOption = (tool: ToolIdentifier): { value: string; label: string } => ({
+  value: slugify(tool),
+  label: tool.replace(/\s+/g, " ").trim(),
+});
+
+const mergeIntegrationOptions = (
+  field: IntegrationPickerField,
+  tools: ToolIdentifier[]
+): { options: FieldOption[]; values: string[] } => {
+  const existing = new Map(field.options.map(option => [option.value, option] as const));
+  const selected: string[] = [];
+
+  tools.forEach(tool => {
+    if (tool === "Other") {
+      return;
+    }
+    const { value, label } = toolToOption(tool);
+    if (!existing.has(value)) {
+      existing.set(value, { value, label });
+    }
+    if (!selected.includes(value)) {
+      selected.push(value);
+    }
+  });
+
+  const options = Array.from(existing.values());
+  const maxSelections = field.maxSelections ?? selected.length;
+  return {
+    options,
+    values: selected.slice(0, maxSelections),
+  };
+};
+
+const mapTeamSizeToOption = (bracket: TeamSizeBracket | undefined): string | undefined => {
+  switch (bracket) {
+    case "solo":
+      return "1";
+    case "1-9":
+      return "2-5";
+    case "10-24":
+      return "6-20";
+    case "25+":
+      return "21-50";
+    default:
+      return undefined;
+  }
+};
+
+const mapApprovalDepthToToggleValue = (depth: ApprovalChainDepth | undefined): string | undefined => {
+  if (!depth || depth === "unknown") {
+    return undefined;
+  }
+  return depth === "single" ? "disabled" : "required";
+};
 
 interface AttributionBuildContext {
   recipe: CanvasRecipe;
@@ -324,6 +390,34 @@ const buildFormPlan = (
       return {
         ...field,
         label: response.templateCopy.badgeCaption || field.label,
+      };
+    }
+
+    if (field.kind === "select" && field.id === FIELD_IDS.TEAM_SIZE) {
+      const recommended = mapTeamSizeToOption(response.promptSignals.teamSizeBracket.value);
+      return {
+        ...field,
+        value: recommended ?? field.value,
+      };
+    }
+
+    if (field.kind === "integration_picker") {
+      const recommendedTools = response.promptSignals.tools.value.filter(tool => tool !== "Other");
+      if (recommendedTools.length) {
+        const { options: mergedOptions, values } = mergeIntegrationOptions(field, recommendedTools);
+        return {
+          ...field,
+          options: mergedOptions,
+          values: values.length ? values : field.values,
+        };
+      }
+    }
+
+    if (field.kind === "admin_toggle" && field.id === FIELD_IDS.ADMIN_CONTROLS) {
+      const recommended = mapApprovalDepthToToggleValue(response.promptSignals.approvalChainDepth.value);
+      return {
+        ...field,
+        value: recommended ?? field.value,
       };
     }
 
