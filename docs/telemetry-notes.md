@@ -21,3 +21,21 @@ All writes are wrapped in a best-effort guard. If the filesystem is read-only, l
 - The telemetry helper trims duplicate warnings once file writes fail.
 - The customize drawer logs immediately without debouncing to keep the audit trail complete.
 - The script `scripts/tail-plan-edits.ts` formats JSON entries for readability and follows append-only semantics.
+
+## Label review queue
+
+When `ENABLE_LABELING_REVIEW=true`, the app keeps an in-memory queue of interesting plan edits that product can review during pilot sessions. The queue lives for the lifetime of the Node process, so it resets on every Railway redeploy.
+
+### Adding and reading candidates
+- Start the dev server with `ENABLE_LABELING_REVIEW=true bun run dev` so the API endpoint is active.
+- Enqueue a candidate with `curl -X POST http://localhost:3000/api/labeling -H "Content-Type: application/json" -d '{"recipeId":"R1","controlId":"copyTone","previousValue":"collaborative","nextValue":"trusted-advisor","signalsSummary":"[]","notes":"Flag for copy review"}'`.
+- Review the current queue with one of:
+  - `bun scripts/labeling/print-current.ts`
+  - `curl http://localhost:3000/api/labeling`
+
+On Railway, swap the base URL for the deployed hostname or use `railway run curl ...` from the project root. Copy the JSON output into a log note or spreadsheet as needed.
+
+### Operational details
+- The queue keeps the 50 most recent entries and silently drops older ones to avoid unbounded memory use.
+- When the feature flag is false, the API responds with `403` and the helpers become no-ops.
+- `POST /api/labeling` stores the payload emitted by `recordPlanEdit` plus free-form reviewer notes for quick triage.
