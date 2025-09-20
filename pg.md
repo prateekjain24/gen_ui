@@ -25,7 +25,7 @@
 
 ## Engineering anchors
 - Typed signal schema + constants shared in `src/lib` so extractors, UI, and telemetry stay aligned.
-- Prompt + response templates toggled by feature flag to keep Canvas MVP stable while the PropertyGuru preset evolves.
+- Prompt + response templates toggled by feature flag (`CANVAS_PRESET=property_guru`) to keep Canvas MVP stable while the PropertyGuru preset evolves.
 - Mapper utility converts planner output to PropertyGuru search payloads (district codes, highlights, next steps) with graceful fallbacks and logging.
 - Jest fixtures cover representative seeker briefs to freeze expected plan shapes and payloads.
 

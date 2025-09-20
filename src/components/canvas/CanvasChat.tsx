@@ -30,6 +30,7 @@ import type {
   TeamSizeBracket,
   ToolIdentifier,
 } from "@/lib/prompt-intel/types";
+import type { PropertyGuruPlanTemplate } from "@/lib/property-guru/prompt";
 import { createTelemetryQueue, type TelemetryQueue } from "@/lib/telemetry/events";
 import type { AIAttribution, AIAttributionSignal } from "@/lib/types/ai";
 import type { Field, FieldOption, FormPlan, IntegrationPickerField, StepperItem } from "@/lib/types/form";
@@ -59,6 +60,7 @@ interface TemplateCopyPayload {
   };
   badgeCaption: string;
   issues: SlotValidationIssue[];
+  propertyGuruPlan?: PropertyGuruPlanTemplate;
 }
 
 interface CanvasPlanState extends CanvasPlanResponse {

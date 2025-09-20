@@ -8,6 +8,7 @@ import type { CanvasRecipeId } from "@/lib/canvas/recipes";
 import { getRecipe } from "@/lib/canvas/recipes";
 import type { SlotValidationIssue } from "@/lib/canvas/template-validator";
 import { LLM_CONFIG } from "@/lib/constants";
+import { isPropertyGuruPreset } from "@/lib/config/presets";
 import {
   getOpenAIProvider,
   retryWithExponentialBackoff,
@@ -19,11 +20,19 @@ import { recordLLMUsage } from "@/lib/llm/usage-tracker";
 import { scoreRecipeKnobs, type RecipePersonalizationResult } from "@/lib/personalization/scoring";
 import { buildPromptSignals, summarizePromptSignals } from "@/lib/prompt-intel";
 import type { PromptSignals } from "@/lib/prompt-intel/types";
+import {
+  PROPERTY_GURU_PLAN_SYSTEM_PROMPT,
+  buildPropertyGuruPlanPrompt,
+  createDefaultPropertyGuruPlan,
+  propertyGuruPlanSchema,
+  type PropertyGuruPlanTemplate,
+} from "@/lib/property-guru/prompt";
 import { canProcessRequest, trackFailure, trackPersonalizationSuccess } from "@/lib/runtime/personalization-health";
 import { withTimeout } from "@/lib/runtime/with-timeout";
 import { sessionStore } from "@/lib/store/session";
 import type { PromptSignalsExtractedEvent } from "@/lib/types/events";
 import { createDebugger, debugError } from "@/lib/utils/debug";
+import { extractPropertyGuruSignals } from "@/lib/utils/property-guru-signals";
 
 export const runtime = "nodejs";
 
@@ -127,6 +136,7 @@ interface TemplateCopyPayload {
   };
   badgeCaption: string;
   issues: SlotValidationIssue[];
+  propertyGuruPlan?: PropertyGuruPlanTemplate;
 }
 
 type CanvasDecisionResponseBase = Omit<CanvasDecisionResponse, "promptSignals" | "personalization" | "templateCopy">;
@@ -509,7 +519,23 @@ const copySchema = z.object({
 
 const PLAN_COPY_TIMEOUT_MS = 25_000;
 
-const generatePlanCopy = async ({
+const PROPERTY_GURU_PLAN_TIMEOUT_MS = 25_000;
+
+const generatePlanCopy = async (options: {
+  message: string;
+  recipeId: CanvasRecipeId;
+  persona: CanvasDecisionResponse["persona"];
+  signals: PromptSignals;
+  overrides: RecipePersonalizationResult["overrides"];
+}): Promise<{ copy: TemplateCopyPayload }> => {
+  if (isPropertyGuruPreset()) {
+    return generatePropertyGuruPlanCopy(options);
+  }
+
+  return generateCanvasPlanCopy(options);
+};
+
+const generateCanvasPlanCopy = async ({
   message,
   recipeId,
   persona,
@@ -606,3 +632,72 @@ const getDefaultCopy = (): TemplateCopyPayload => ({
   badgeCaption: "AI recommended",
   issues: [],
 });
+
+const getDefaultPropertyGuruCopy = (): TemplateCopyPayload => ({
+  stepTitle: "PropertyGuru plan preview",
+  helperText: "Review the concierge plan, then adjust essentials or lifestyle cues.",
+  primaryCta: "Preview curated listings",
+  callout: {
+    heading: "Fast track",
+    body: "Use the plan actions to jump into listings or financing support.",
+  },
+  badgeCaption: "AI concierge",
+  issues: [],
+  propertyGuruPlan: createDefaultPropertyGuruPlan(),
+});
+
+const generatePropertyGuruPlanCopy = async ({
+  message,
+}: {
+  message: string;
+  recipeId: CanvasRecipeId;
+  persona: CanvasDecisionResponse["persona"];
+  signals: PromptSignals;
+  overrides: RecipePersonalizationResult["overrides"];
+}): Promise<{ copy: TemplateCopyPayload }> => {
+  const { signals: propertyGuruSignals } = extractPropertyGuruSignals(message);
+  const defaults = getDefaultPropertyGuruCopy();
+  const openaiApiKey = process.env.OPENAI_API_KEY;
+
+  if (!openaiApiKey) {
+    return { copy: defaults };
+  }
+
+  const openai = getOpenAIProvider();
+  const prompt = buildPropertyGuruPlanPrompt({ prompt: message, signals: propertyGuruSignals });
+
+  try {
+    const { object, usage } = await withTimeout(
+      signal =>
+        generateObject({
+          model: openai(LLM_CONFIG.model),
+          system: PROPERTY_GURU_PLAN_SYSTEM_PROMPT,
+          prompt,
+          schema: propertyGuruPlanSchema,
+          abortSignal: signal,
+          maxRetries: 1,
+        }),
+      { timeoutMs: PROPERTY_GURU_PLAN_TIMEOUT_MS }
+    );
+
+    recordLLMUsage(usage);
+
+    const plan = propertyGuruPlanSchema.parse(object);
+    const copy: TemplateCopyPayload = {
+      ...defaults,
+      propertyGuruPlan: plan,
+      issues: [],
+    };
+
+    return { copy };
+  } catch (error) {
+    debugError("PropertyGuru plan generation failed", error);
+    copyLog("PropertyGuru generation error", { message });
+    return {
+      copy: {
+        ...defaults,
+        issues: [{ slotId: "*", reason: "property_guru_plan_generation_failed", severity: "warning" }],
+      },
+    };
+  }
+};

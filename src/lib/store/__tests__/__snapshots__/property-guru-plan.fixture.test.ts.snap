@@ -1,0 +1,94 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`PropertyGuru plan preset fixtures produces prompt context containing extracted signals 1`] = `
+"Context: {
+  "prompt": "Expecting twins in 4 months, want a 3BR condo near Tampines MRT, budget around 1.4M but I'll stretch for turnkey. Need good preschool options and low-reno.",
+  "signals": {
+    "location": {
+      "primaryArea": "Tampines",
+      "radiusKm": 1.5,
+      "anchorPoints": [
+        "Tampines MRT"
+      ],
+      "districtIds": [
+        18
+      ]
+    },
+    "price": {
+      "currency": "SGD",
+      "max": 1400000,
+      "min": 1400000,
+      "stretchOk": true
+    },
+    "propertyType": "condo",
+    "bedrooms": 3,
+    "moveInHorizon": "six_months",
+    "lifestyle": [
+      "near_mrt",
+      "near_schools",
+      "childcare_ready",
+      "family_friendly",
+      "move_in_ready"
+    ],
+    "financeReadiness": "unknown",
+    "tonePreference": "reassuring"
+  }
+}
+
+Return a JSON object that matches the PropertyGuru schema."
+`;
+
+exports[`PropertyGuru plan preset fixtures validates golden plan structure for the Tampines MRT twins scenario 1`] = `
+{
+  "essentials": {
+    "items": [
+      {
+        "helper": "Keeps you within walking distance and near childcare hubs.",
+        "label": "Location radius",
+        "value": "1.5km around Tampines MRT",
+      },
+      {
+        "helper": "Set alerts at SGD 1.45M so turnkey options surface quickly.",
+        "label": "Price band",
+        "value": "SGD 1.2M – 1.4M (stretch +5% for turnkey units)",
+      },
+      {
+        "helper": "Filter for renovated family layouts with dual nursery potential.",
+        "label": "Bedrooms & layout",
+        "value": "3 bedrooms, turnkey finish",
+      },
+    ],
+    "title": "Tune the essentials first",
+  },
+  "intent_summary": "Focused search: 3BR turnkey condo near Tampines MRT within ~SGD 1.4M.",
+  "lifestyle_filters": {
+    "helper": "Prioritise projects near preschools with playgrounds and service corridors.",
+    "highlights": [
+      "Childcare-ready developments",
+      "Family-friendly facilities",
+      "Low-renovation inventory",
+    ],
+    "title": "Lifestyle filters to toggle",
+  },
+  "micro_copy": {
+    "follow_up": "Saved searches send weekly MRT-adjacent family picks plus preschool intel.",
+    "reassurance": "Listings refresh daily; concierge flags new turnkey options instantly.",
+  },
+  "plan_actions": {
+    "primary": {
+      "description": "Opens a shortlist with MRT proximity and school filters applied.",
+      "label": "Preview curated Tampines listings",
+    },
+    "secondary": [
+      {
+        "description": "Align financing buffers for turnkey units and twins arrival timeline.",
+        "label": "Book PropertyGuru Finance consult",
+      },
+      {
+        "description": "Compare childcare options and transport during a guided visit.",
+        "label": "Schedule neighbourhood tour",
+      },
+    ],
+  },
+}
+`;
