@@ -15,17 +15,26 @@ jest.mock("@/lib/llm/eval-logger", () => ({
   logCanvasDecision: jest.fn(async () => undefined),
 }));
 
+jest.mock("@/lib/runtime/personalization-health", () => ({
+  canProcessRequest: jest.fn(() => ({ allowed: true })),
+  trackFailure: jest.fn(),
+  trackPersonalizationSuccess: jest.fn(),
+}));
+
 jest.mock("@/lib/llm/client", () => ({
   getOpenAIProvider: jest.fn(() => (model: string) => model),
-  invokeWithTimeout: jest.fn(
-    (_timeout: number, operation: (signal: AbortSignal) => Promise<unknown>) =>
-      operation(new AbortController().signal)
-  ),
   retryWithExponentialBackoff: jest.fn(
     async (operation: (attempt: number) => Promise<unknown>, _settings: unknown, _hooks?: unknown) =>
       operation(1)
   ),
   shouldRetryOnError: jest.fn(() => true),
+}));
+
+jest.mock("@/lib/runtime/with-timeout", () => ({
+  withTimeout: jest.fn(
+    (operation: (signal: AbortSignal) => Promise<unknown>, _options?: { timeoutMs?: number }) =>
+      operation(new AbortController().signal)
+  ),
 }));
 
 jest.mock("@/lib/llm/usage-tracker", () => ({
@@ -43,6 +52,11 @@ describe("POST /api/canvas/plan", () => {
   };
   const { logCanvasDecision } = jest.requireMock("@/lib/llm/eval-logger") as {
     logCanvasDecision: jest.MockedFunction<LogCanvasDecisionType>;
+  };
+  const personalizationHealth = jest.requireMock("@/lib/runtime/personalization-health") as {
+    canProcessRequest: jest.Mock;
+    trackFailure: jest.Mock;
+    trackPersonalizationSuccess: jest.Mock;
   };
 
   const loadRoute = async () => {
@@ -66,6 +80,7 @@ describe("POST /api/canvas/plan", () => {
       confidence: 0.8,
       reasoning: "Team signals detected",
     });
+    personalizationHealth.canProcessRequest.mockReturnValue({ allowed: true });
   });
 
   it("returns LLM decision when confidence is high", async () => {
@@ -107,6 +122,7 @@ describe("POST /api/canvas/plan", () => {
     expect(logCanvasDecision).toHaveBeenCalledWith(
       expect.objectContaining({ decisionSource: "llm", recipeId: "R3" })
     );
+    expect(personalizationHealth.trackPersonalizationSuccess).toHaveBeenCalled();
   });
 
   it("falls back to heuristics when LLM confidence is low", async () => {
@@ -193,6 +209,19 @@ describe("POST /api/canvas/plan", () => {
     expect(json.error).toBe("Invalid request payload");
   });
 
+  it("rate limits sessions after repeated requests", async () => {
+    personalizationHealth.canProcessRequest.mockReturnValueOnce({ allowed: false, retryAfterMs: 3_500 });
+
+    const POST = await loadRoute();
+    const response = await POST(createRequest({ message: "client rollout", sessionId: "session-123" }));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("4");
+    await expect(response.json()).resolves.toEqual({
+      error: "Too many personalization attempts. Please retry shortly.",
+    });
+  });
+
   it("returns 500 for unexpected errors", async () => {
     classifyByHeuristics.mockImplementation(() => {
       throw new Error("boom");
@@ -203,6 +232,7 @@ describe("POST /api/canvas/plan", () => {
 
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({ error: "Internal server error" });
+    expect(personalizationHealth.trackFailure).toHaveBeenCalled();
   });
 
   it("skips LLM when API key missing", async () => {

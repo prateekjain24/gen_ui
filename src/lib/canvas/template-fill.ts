@@ -8,7 +8,6 @@ import { TEMPLATE_CATALOG, TEMPLATE_IDS, type Template, type TemplateId } from "
 import { LLM_CONFIG } from "@/lib/constants";
 import {
   getOpenAIProvider,
-  invokeWithTimeout,
   retryWithExponentialBackoff,
   shouldRetryOnError,
   type BackoffSettings,
@@ -20,6 +19,7 @@ import {
   type TemplateCacheStatus,
 } from "@/lib/prompt-intel/template-cache";
 import type { PromptSignals } from "@/lib/prompt-intel/types";
+import { withTimeout } from "@/lib/runtime/with-timeout";
 import { createDebugger, debugError } from "@/lib/utils/debug";
 
 const debug = createDebugger("Canvas:TemplateFill");
@@ -160,7 +160,7 @@ export const renderTemplateCopy = async (context: TemplateFillContext): Promise<
     try {
       const result = await retryWithExponentialBackoff(
         attempt =>
-          invokeWithTimeout(TEMPLATE_TIMEOUT_MS, async signal => {
+          withTimeout(async signal => {
             const output = await generateText({
               model: openai(LLM_CONFIG.model),
               system: TEMPLATE_SYSTEM_PROMPT,
@@ -175,7 +175,7 @@ export const renderTemplateCopy = async (context: TemplateFillContext): Promise<
             });
             debug("Template fill success (attempt %d)", attempt);
             return output;
-          }),
+          }, { timeoutMs: TEMPLATE_TIMEOUT_MS }),
         TEMPLATE_RETRY,
         {
           shouldRetry: error => shouldRetryOnError(error),

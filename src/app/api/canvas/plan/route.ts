@@ -12,7 +12,6 @@ import type { TemplateId } from "@/lib/canvas/templates";
 import { LLM_CONFIG } from "@/lib/constants";
 import {
   getOpenAIProvider,
-  invokeWithTimeout,
   retryWithExponentialBackoff,
   shouldRetryOnError,
   type BackoffSettings,
@@ -22,6 +21,8 @@ import { recordLLMUsage } from "@/lib/llm/usage-tracker";
 import { scoreRecipeKnobs, type RecipePersonalizationResult } from "@/lib/personalization/scoring";
 import { buildPromptSignals, summarizePromptSignals } from "@/lib/prompt-intel";
 import type { PromptSignals } from "@/lib/prompt-intel/types";
+import { canProcessRequest, trackFailure, trackPersonalizationSuccess } from "@/lib/runtime/personalization-health";
+import { withTimeout } from "@/lib/runtime/with-timeout";
 import { sessionStore } from "@/lib/store/session";
 import type { PromptSignalsExtractedEvent } from "@/lib/types/events";
 import { createDebugger, debugError } from "@/lib/utils/debug";
@@ -103,6 +104,7 @@ const LLM_RETRY_SETTINGS: BackoffSettings = {
 };
 
 const LLM_CONFIDENCE_THRESHOLD = 0.6;
+const RATE_LIMIT_WINDOW_FALLBACK_MS = 60_000;
 
 type CanvasDecisionResponse = {
   recipeId: CanvasRecipeId;
@@ -176,7 +178,7 @@ async function classifyWithLLM(
 
   const result = await retryWithExponentialBackoff(
     attempt =>
-      invokeWithTimeout(LLM_TIMEOUT_MS, async signal => {
+      withTimeout(async signal => {
         const output = await generateText({
           model: openai(LLM_CONFIG.model),
           system: CANVAS_CLASSIFIER_SYSTEM_PROMPT,
@@ -189,7 +191,7 @@ async function classifyWithLLM(
         recordLLMUsage(output.usage ?? null);
         log(`Canvas classifier succeeded (attempt ${attempt})`);
         return output;
-      }),
+      }, { timeoutMs: LLM_TIMEOUT_MS }),
     LLM_RETRY_SETTINGS,
     {
       shouldRetry: (error, _attempt) => shouldRetryOnError(error),
@@ -353,6 +355,25 @@ export async function POST(req: NextRequest) {
     }
 
     const { message, domainEmail, teamSize, metadata, sessionId } = parsedBody.data;
+
+    if (sessionId) {
+      const rateLimit = canProcessRequest(sessionId);
+      if (!rateLimit.allowed) {
+        const retryAfterSeconds = Math.max(
+          1,
+          Math.ceil(((rateLimit.retryAfterMs ?? RATE_LIMIT_WINDOW_FALLBACK_MS) / 1000))
+        );
+        return NextResponse.json(
+          { error: "Too many personalization attempts. Please retry shortly." },
+          {
+            status: 429,
+            headers: {
+              "Retry-After": String(retryAfterSeconds),
+            },
+          }
+        );
+      }
+    }
     const heuristicsDecision = classifyByHeuristics(message);
 
     let responsePayload: CanvasDecisionResponseBase = {
@@ -470,9 +491,11 @@ export async function POST(req: NextRequest) {
       templateTelemetry: templateFill.telemetry,
     });
 
+    trackPersonalizationSuccess();
     return NextResponse.json(responsePayloadWithSignals);
   } catch (error) {
     debugError("Canvas plan endpoint error", error);
+    trackFailure();
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

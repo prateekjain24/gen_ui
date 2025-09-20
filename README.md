@@ -118,6 +118,7 @@ bun run dev
 | `ENABLE_PROMPT_INTEL` | Toggle keyword/LLM signal extraction | `true` |
 | `ENABLE_PERSONALIZATION` | Toggle knob scoring + customize drawer | `true` |
 | `ENABLE_LABELING_REVIEW` | Enable in-memory labeling queue + CLI tools | `false` |
+| `PERSONALIZATION_TIMEOUT_MS` | Timeout (ms) for OpenAI/personalization calls | `15000` |
 | `EVAL_LOG_DIR` | Directory for JSONL eval logs | `eval/logs` |
 
 ### Useful Scripts
@@ -146,7 +147,14 @@ bun run dev
    - Use `bun run push:evals:dry` before pushing to Airtable.
 
 ---
-## 6. Telemetry & Safety
+## 6. Runtime Guardrails
+
+- **Timeouts:** OpenAI and personalization calls use `withTimeout` (default `PERSONALIZATION_TIMEOUT_MS=15000`). Raise/lower via env; set to `0` to disable.
+- **Soft disable:** Three personalization failures within two minutes flip `ENABLE_PERSONALIZATION=false` until restart. Look for `personalization-soft-disabled` warnings in logs.
+- **Per-session rate limit:** A session may request personalization five times per minute. Exceeding the limit returns HTTP 429 with a `Retry-After` header.
+- **Queue & labeling:** Accepted edits live in `config/labeling/accepted.json`; use `scripts/labeling/accept.ts` to promote queue items.
+
+## 7. Telemetry & Safety
 
 - **Telemetry queue** (`src/lib/telemetry/events.ts`) batches UX events; template fill telemetry is recorded via plan API logging.
 - **Fallback reasons** distinguish between personalization guardrails (`insufficient_confidence`, `conflict_governance_vs_fast`, etc.) and template validation issues (`invalid_template_json`, `required_slot_missing`).
@@ -154,7 +162,7 @@ bun run dev
 - **UI feedback** warns when defaults were used due to slot validation failures.
 
 ---
-## 7. Roadmap
+## 8. Roadmap
 
 - Adaptive tone classifier (beyond keyword heuristics).
 - Incremental template re-render pipeline (per-slot retries instead of whole template).
@@ -162,7 +170,7 @@ bun run dev
 - Experiment harness to compare template copy variants against baseline CTR.
 
 ---
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 | Symptom | Likely Cause | Fix |
 |---------|--------------|-----|
@@ -172,7 +180,7 @@ bun run dev
 | Jest warns about active timers | Ensure mocks for `retryWithExponentialBackoff` resolve async operations (see template-fill tests). |
 
 ---
-## 9. Contributing
+## 10. Contributing
 
 1. Fork or branch from `master`.
 2. Add/adjust fixtures when changing personalization heuristics.

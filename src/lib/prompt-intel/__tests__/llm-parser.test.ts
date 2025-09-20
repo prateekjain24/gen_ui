@@ -6,7 +6,10 @@ jest.mock('ai', () => ({
 
 jest.mock('@/lib/llm/client', () => ({
   getOpenAIProvider: jest.fn(),
-  invokeWithTimeout: jest.fn(),
+}));
+
+jest.mock('@/lib/runtime/with-timeout', () => ({
+  withTimeout: jest.fn(),
 }));
 
 jest.mock('@/lib/llm/usage-tracker', () => ({
@@ -23,7 +26,8 @@ jest.mock('@/lib/utils/debug', () => {
 });
 
 const { generateText } = jest.requireMock('ai');
-const { getOpenAIProvider, invokeWithTimeout } = jest.requireMock('@/lib/llm/client');
+const { getOpenAIProvider } = jest.requireMock('@/lib/llm/client');
+const { withTimeout } = jest.requireMock('@/lib/runtime/with-timeout');
 const { recordLLMUsage } = jest.requireMock('@/lib/llm/usage-tracker');
 const { debugError } = jest.requireMock('@/lib/utils/debug');
 
@@ -36,7 +40,10 @@ describe('fetchSignalsFromLLM', () => {
     const mockModel = jest.fn(() => 'mock-model');
     getOpenAIProvider.mockReturnValue(mockModel);
 
-    invokeWithTimeout.mockImplementation(async (_timeout: number, operation: (signal: AbortSignal) => Promise<unknown>) => {
+    withTimeout.mockImplementation(async (operation: (signal: AbortSignal) => Promise<unknown>, options?: { timeoutMs?: number }) => {
+      if (options?.timeoutMs === undefined) {
+        throw new Error('Expected timeout configuration');
+      }
       return operation(new AbortController().signal);
     });
   });
@@ -53,10 +60,7 @@ describe('fetchSignalsFromLLM', () => {
 
     const result = await fetchSignalsFromLLM('We have 18 operators relying on Slack and Salesforce.');
 
-    expect(invokeWithTimeout).toHaveBeenCalledWith(
-      30000,
-      expect.any(Function)
-    );
+    expect(withTimeout).toHaveBeenCalledWith(expect.any(Function), { timeoutMs: 30_000 });
     expect(generateText).toHaveBeenCalledWith(
       expect.objectContaining({
         model: 'mock-model',
@@ -91,7 +95,7 @@ describe('fetchSignalsFromLLM', () => {
   });
 
   it('returns empty object when invocation throws', async () => {
-    invokeWithTimeout.mockRejectedValueOnce(new Error('timeout'));
+    withTimeout.mockRejectedValueOnce(new Error('timeout'));
 
     const result = await fetchSignalsFromLLM('This will timeout');
 

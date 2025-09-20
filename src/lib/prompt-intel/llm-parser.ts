@@ -16,8 +16,9 @@ import type {
 } from './types';
 
 import { LLM_CONFIG } from '@/lib/constants';
-import { getOpenAIProvider, invokeWithTimeout } from '@/lib/llm/client';
+import { getOpenAIProvider } from '@/lib/llm/client';
 import { recordLLMUsage } from '@/lib/llm/usage-tracker';
+import { withTimeout } from '@/lib/runtime/with-timeout';
 import { createDebugger, debugError } from '@/lib/utils/debug';
 
 type IntegrationCriticality = NonNullable<PromptSignalsPartial['integrationCriticality']>['value'];
@@ -173,7 +174,7 @@ export async function fetchSignalsFromLLM(
   try {
     const openai = getOpenAIProvider();
 
-    const response = await invokeWithTimeout(PROMPT_TIMEOUT_MS, async timeoutSignal => {
+    const response = await withTimeout(async timeoutSignal => {
       const combined = combineSignals(timeoutSignal, abortSignal);
       try {
         const output = await generateText({
@@ -191,7 +192,7 @@ export async function fetchSignalsFromLLM(
       } finally {
         combined.cleanup();
       }
-    });
+    }, { timeoutMs: PROMPT_TIMEOUT_MS });
 
     const raw = response.text ?? '';
     const jsonText = extractJsonSnippet(raw);

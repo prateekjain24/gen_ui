@@ -8,24 +8,27 @@ import type { PromptSignals } from "@/lib/prompt-intel/types";
 
 jest.mock("@/lib/llm/client", () => ({
   getOpenAIProvider: jest.fn(() => (model: string) => model),
-  invokeWithTimeout: jest.fn(
-    (_timeout: number, operation: (signal: AbortSignal) => Promise<unknown>) =>
-      operation(new AbortController().signal)
-  ),
   retryWithExponentialBackoff: jest.fn(async (operation: (attempt: number) => Promise<unknown>) =>
     operation(1)
   ),
   shouldRetryOnError: jest.fn(() => false),
 }));
 
+jest.mock("@/lib/runtime/with-timeout", () => ({
+  withTimeout: jest.fn(
+    (operation: (signal: AbortSignal) => Promise<unknown>) =>
+      operation(new AbortController().signal)
+  ),
+}));
+
 const llmClientMock = jest.requireMock("@/lib/llm/client") as {
   getOpenAIProvider: jest.Mock;
-  invokeWithTimeout: jest.Mock;
   retryWithExponentialBackoff: jest.Mock;
   shouldRetryOnError: jest.Mock;
 };
 
 const { retryWithExponentialBackoff } = llmClientMock;
+const { withTimeout } = jest.requireMock("@/lib/runtime/with-timeout");
 
 const baseSignals: PromptSignals = {
   teamSizeBracket: { value: "10-24", metadata: { source: "merge", confidence: 0.6 } },
@@ -65,14 +68,13 @@ describe("renderTemplateCopy", () => {
   beforeEach(() => {
     jest.resetAllMocks();
     llmClientMock.getOpenAIProvider.mockImplementation(() => (model: string) => model);
-    llmClientMock.invokeWithTimeout.mockImplementation(
-      (_timeout: number, operation: (signal: AbortSignal) => Promise<unknown>) =>
-        operation(new AbortController().signal)
-    );
     llmClientMock.retryWithExponentialBackoff.mockImplementation(
       async (operation: (attempt: number) => Promise<unknown>) => operation(1)
     );
     llmClientMock.shouldRetryOnError.mockImplementation(() => false);
+    withTimeout.mockImplementation(
+      (operation: (signal: AbortSignal) => Promise<unknown>) => operation(new AbortController().signal)
+    );
     process.env.OPENAI_API_KEY = "test-key";
     templateCompletionCache.clear();
   });
