@@ -67,21 +67,31 @@ export function AIAttributionBadge({ attribution, className, size = "md" }: AIAt
   };
 
   return (
-    <div ref={containerRef} className={cn("relative inline-flex", className)}>
-      <button
-        type="button"
-        onClick={() => setOpen(current => !current)}
-        aria-expanded={open}
-        aria-controls={tooltipId}
-        className={cn(
-          "inline-flex items-center gap-1 rounded-full border border-transparent font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-          config.tone,
-          paddingClass
-        )}
-      >
-        <Icon aria-hidden="true" className={size === "sm" ? "h-3 w-3" : "h-4 w-4"} />
-        <span className="font-semibold tracking-tight">{config.label}</span>
-      </button>
+    <div
+      ref={containerRef}
+      className={cn(
+        "group relative inline-flex cursor-pointer items-center gap-1 rounded-full border border-transparent font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        config.tone,
+        paddingClass,
+        className
+      )}
+      onClick={() => setOpen(current => !current)}
+      onKeyDown={event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          setOpen(current => !current);
+        }
+        if (event.key === "Escape") {
+          setOpen(false);
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-expanded={open}
+      aria-controls={tooltipId}
+    >
+      <Icon aria-hidden="true" className={size === "sm" ? "h-3 w-3" : "h-4 w-4"} />
+      <span className="font-semibold tracking-tight">{config.label}</span>
       {open ? (
         <div
           id={tooltipId}
