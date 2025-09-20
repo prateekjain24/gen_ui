@@ -462,13 +462,13 @@ exports[`prompt fixtures produces stable signals for {\\n  id: 'tooling-overlap'
   "tools": {
     "metadata": {
       "confidence": 1,
-      "notes": "keywords: Slack (slack), Jira (jira), Notion (notion)",
+      "notes": "keywords: Slack (slack), Notion (notion), Jira (jira)",
       "source": "keyword",
     },
     "value": [
       "Slack",
-      "Jira",
       "Notion",
+      "Jira",
     ],
   },
 }

@@ -1,0 +1,201 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`PropertyGuru flow playbooks {\\n  id: 'first_time_ec',\\n  prompt: 'First time buying, looking at executive condos (EC) in Punggol around 1M, not pre-approved, two kids in primary school, want to stay near primary schools, want grants guidance and weekly listing digests.',\\n  plan: [Object],\\n  expectations: [Object]\\n} scenario stays coherent 1`] = `
+{
+  "copy": {
+    "followUp": "Weekly digests keep new EC options top of mind.",
+    "hero": "Guide your first EC purchase in Punggol with grants in mind.",
+    "reassurance": "We will nudge you on grants and eligibility as you progress.",
+    "tone": "reassuring",
+  },
+  "filters": {
+    "area": "Punggol",
+    "bedrooms": 3,
+    "districts": [
+      19,
+    ],
+    "lifestyle": [
+      "near_schools",
+      "family_friendly",
+    ],
+    "maxPrice": 1000000,
+    "minPrice": 1000000,
+    "propertyType": "executive_condo",
+    "radiusKm": 5,
+  },
+  "highlights": [
+    "Nearby primary schools",
+    "Family amenities",
+    "Weekly digest ready",
+    "Near schools",
+    "Family-friendly",
+  ],
+  "nextSteps": [
+    "savedSearch",
+    "startHdbGrantChecklist",
+  ],
+}
+`;
+
+exports[`PropertyGuru flow playbooks {\\n  id: 'multigenerational_accessibility',\\n  prompt: 'Retiring parents moving in, need 4BR near Bishan, lift access, wheelchair friendly, near hospitals and parks; budget 2.3M; we can wait 6-9 months.',\\n  plan: [Object],\\n  expectations: [Object]\\n} scenario stays coherent 1`] = `
+{
+  "copy": {
+    "followUp": "Expect fortnightly updates while you wait for the right listing.",
+    "hero": "Plan a Bishan move-in that keeps the whole family comfortable.",
+    "reassurance": "We emphasise accessibility and calm routes so parents settle in comfortably.",
+    "tone": "reassuring",
+  },
+  "filters": {
+    "area": "Bishan",
+    "bedrooms": 4,
+    "districts": [
+      20,
+    ],
+    "lifestyle": [
+      "wheelchair_access",
+      "healthcare_access",
+      "green_spaces",
+      "rental_hotspot",
+      "family_friendly",
+    ],
+    "maxPrice": 2300000,
+    "minPrice": 2300000,
+    "propertyType": "condo",
+    "radiusKm": 5,
+  },
+  "highlights": [
+    "Wheelchair-friendly routes",
+    "Hospitals within 10 minutes",
+    "Park connectors & greenery",
+    "Wheelchair access",
+    "Healthcare access",
+    "Green spaces",
+    "Rental hotspot",
+    "Family-friendly",
+  ],
+  "nextSteps": [
+    "viewListings",
+    "scheduleTour",
+    "expertConsult",
+  ],
+}
+`;
+
+exports[`PropertyGuru flow playbooks {\\n  id: 'split_city_worker',\\n  prompt: 'Splitting time between Singapore and KL, need a 1BR serviced apartment along the Thomson-East Coast TEL line, want co-working nearby and flexible lease; budget SGD 3.2K monthly.',\\n  plan: [Object],\\n  expectations: [Object]\\n} scenario stays coherent 1`] = `
+{
+  "copy": {
+    "followUp": "Expect mid-week digests and concierge nudges when new serviced stock appears.",
+    "hero": "Balance your split-city lifestyle with serviced TEL options.",
+    "reassurance": "We will flag concierge-ready TEL units as soon as they refresh.",
+    "tone": "reassuring",
+  },
+  "filters": {
+    "area": "Thomson-east Coast Line",
+    "bedrooms": 1,
+    "districts": [],
+    "lifestyle": [
+      "co_working",
+      "serviced_amenities",
+      "dual_city",
+    ],
+    "maxPrice": 3200,
+    "minPrice": 3200,
+    "propertyType": "serviced_apartment",
+    "radiusKm": 5,
+  },
+  "highlights": [
+    "Co-working access",
+    "Serviced amenities",
+    "Flexible lease terms",
+    "Co working",
+    "Dual city",
+  ],
+  "nextSteps": [
+    "viewListings",
+    "scheduleTour",
+    "expertConsult",
+  ],
+}
+`;
+
+exports[`PropertyGuru flow playbooks {\\n  id: 'twins_near_tampines',\\n  prompt: "Expecting twins in 4 months, want a 3BR condo near Tampines MRT, budget around 1.4M but I'll stretch for turnkey. Need good preschool options and low-renovation.",\\n  plan: [Object],\\n  expectations: [Object]\\n} scenario stays coherent 1`] = `
+{
+  "copy": {
+    "followUp": "Saved searches send weekly MRT-adjacent family picks plus preschool intel.",
+    "hero": "Focused search: 3BR turnkey condo near Tampines MRT within ~SGD 1.4M.",
+    "reassurance": "Listings refresh daily; concierge flags new turnkey options instantly.",
+    "tone": "reassuring",
+  },
+  "filters": {
+    "area": "Tampines",
+    "bedrooms": 3,
+    "districts": [
+      18,
+    ],
+    "lifestyle": [
+      "near_mrt",
+      "near_schools",
+      "childcare_ready",
+      "family_friendly",
+      "move_in_ready",
+      "renovation_friendly",
+    ],
+    "maxPrice": 1540000,
+    "minPrice": 1400000,
+    "propertyType": "condo",
+    "radiusKm": 1.5,
+  },
+  "highlights": [
+    "Childcare-ready developments",
+    "Family-friendly facilities",
+    "Low-renovation inventory",
+    "Near MRT",
+    "Near schools",
+    "Childcare ready",
+    "Family-friendly",
+    "Move-in ready",
+    "Renovation friendly",
+  ],
+  "nextSteps": [
+    "viewListings",
+    "mortgagePreCheck",
+    "scheduleTour",
+  ],
+}
+`;
+
+exports[`PropertyGuru flow playbooks {\\n  id: 'yield_investor',\\n  prompt: 'Looking for a 2BR resale condo in Queenstown under 1.3M, strong rental demand, okay with minor reno, want data on yield and past transactions.',\\n  plan: [Object],\\n  expectations: [Object]\\n} scenario stays coherent 1`] = `
+{
+  "copy": {
+    "followUp": "Receive new comparables and rent trend alerts every week.",
+    "hero": "Spot 2BR yield winners in Queenstown under SGD 1.3M.",
+    "reassurance": "We surface units where yield forecasts and tenant demand stay strong.",
+    "tone": "data_driven",
+  },
+  "filters": {
+    "area": "Queenstown",
+    "bedrooms": 2,
+    "districts": [
+      3,
+    ],
+    "lifestyle": [
+      "rental_hotspot",
+    ],
+    "maxPrice": 1300000,
+    "minPrice": 1300000,
+    "propertyType": "condo",
+    "radiusKm": 5,
+  },
+  "highlights": [
+    "Rental hotspot indicators",
+    "Reno-friendly layouts",
+    "Yield comparables",
+    "Rental hotspot",
+  ],
+  "nextSteps": [
+    "viewListings",
+    "savedSearch",
+    "expertConsult",
+  ],
+}
+`;

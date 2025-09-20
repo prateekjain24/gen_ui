@@ -125,6 +125,30 @@ const canvasPlanRenderedEventSchema = z.object({
   ...baseEventShape,
 });
 
+const propertyGuruPlanPayloadEventSchema = z.object({
+  type: z.literal('property_guru_plan_payload'),
+  defaultsApplied: z.array(z.string()),
+  payload: z.any(),
+  signals: z.any(),
+  essentials: z.array(z.string()),
+  lifestyleHighlights: z.array(z.string()),
+  primaryCta: z.string(),
+  secondaryCtas: z.array(z.string()),
+  ...baseEventShape,
+});
+
+const propertyGuruFlowEventSchema = z.object({
+  type: z.literal('property_guru_flow_event'),
+  stage: z.enum(['cta_clicked', 'flow_complete', 'saved_search_created']),
+  ctaLabel: z.string().optional(),
+  experimentId: z.string().optional(),
+  persona: z.string().optional(),
+  payload: z.any().optional(),
+  signals: z.any().optional(),
+  defaultsApplied: z.array(z.string()).optional(),
+  ...baseEventShape,
+});
+
 const eventSchema = z.discriminatedUnion('type', [
   fieldFocusEventSchema,
   fieldBlurEventSchema,
@@ -137,6 +161,8 @@ const eventSchema = z.discriminatedUnion('type', [
   flowAbandonEventSchema,
   errorEventSchema,
   canvasPlanRenderedEventSchema,
+  propertyGuruPlanPayloadEventSchema,
+  propertyGuruFlowEventSchema,
 ]);
 
 const EventBatchSchema = z.object({

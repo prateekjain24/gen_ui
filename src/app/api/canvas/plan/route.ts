@@ -7,8 +7,8 @@ import { CANVAS_CLASSIFIER_SYSTEM_PROMPT, buildCanvasClassifierPrompt } from "@/
 import type { CanvasRecipeId } from "@/lib/canvas/recipes";
 import { getRecipe } from "@/lib/canvas/recipes";
 import type { SlotValidationIssue } from "@/lib/canvas/template-validator";
-import { LLM_CONFIG } from "@/lib/constants";
 import { isPropertyGuruPreset } from "@/lib/config/presets";
+import { LLM_CONFIG } from "@/lib/constants";
 import {
   getOpenAIProvider,
   retryWithExponentialBackoff,
@@ -27,18 +27,20 @@ import {
   propertyGuruPlanSchema,
   type PropertyGuruPlanTemplate,
 } from "@/lib/property-guru/prompt";
-import type { PropertyGuruSignals } from "@/lib/types/property-guru";
 import { canProcessRequest, trackFailure, trackPersonalizationSuccess } from "@/lib/runtime/personalization-health";
 import { withTimeout } from "@/lib/runtime/with-timeout";
 import { sessionStore } from "@/lib/store/session";
 import type { PromptSignalsExtractedEvent, PropertyGuruPlanPayloadEvent } from "@/lib/types/events";
+import type { PropertyGuruSignals } from "@/lib/types/property-guru";
 import { createDebugger, debugError } from "@/lib/utils/debug";
-import { extractPropertyGuruSignals } from "@/lib/utils/property-guru-signals";
 import {
   mapPropertyGuruPlanToSearchPayload,
   type PropertyGuruSearchPayload,
 } from "@/lib/utils/property-guru-plan-mapper";
-import { DEFAULT_PROPERTY_GURU_SIGNALS } from "@/lib/utils/property-guru-signals";
+import {
+  DEFAULT_PROPERTY_GURU_SIGNALS,
+  extractPropertyGuruSignals,
+} from "@/lib/utils/property-guru-signals";
 
 export const runtime = "nodejs";
 
@@ -734,8 +736,13 @@ const generatePropertyGuruPlanCopy = async ({
       issues: [],
     };
 
-    if (sessionId && defaultsApplied.length > 0) {
-      recordPropertyGuruPayloadEvent(sessionId, defaultsApplied, payload);
+    if (sessionId) {
+      recordPropertyGuruPayloadEvent(sessionId, {
+        defaultsApplied,
+        payload,
+        signals: extractedSignals,
+        plan,
+      });
     }
 
     return { copy };
@@ -753,15 +760,31 @@ const generatePropertyGuruPlanCopy = async ({
 
 const recordPropertyGuruPayloadEvent = (
   sessionId: string,
-  defaults: string[],
-  payload: PropertyGuruSearchPayload
+  context: {
+    defaultsApplied: string[];
+    payload: PropertyGuruSearchPayload;
+    signals: PropertyGuruSignals;
+    plan: PropertyGuruPlanTemplate;
+  }
 ) => {
+  const planSections = {
+    essentials: context.plan.essentials.items.map(item => item.label),
+    lifestyleHighlights: context.plan.lifestyle_filters.highlights,
+    primaryCta: context.plan.plan_actions.primary.label,
+    secondaryCtas: context.plan.plan_actions.secondary.map(action => action.label),
+  };
+
   const event: PropertyGuruPlanPayloadEvent = {
     type: 'property_guru_plan_payload',
     timestamp: new Date().toISOString(),
     sessionId,
-    defaultsApplied: defaults,
-    payload,
+    defaultsApplied: context.defaultsApplied,
+    payload: context.payload,
+    signals: context.signals,
+    essentials: planSections.essentials,
+    lifestyleHighlights: planSections.lifestyleHighlights,
+    primaryCta: planSections.primaryCta,
+    secondaryCtas: planSections.secondaryCtas,
   };
 
   const updatedSession = sessionStore.updateSession(sessionId, {

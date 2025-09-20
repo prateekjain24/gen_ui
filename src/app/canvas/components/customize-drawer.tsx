@@ -15,19 +15,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { isPropertyGuruPreset } from "@/lib/config/presets";
 import type { RecipeKnobOverrides } from "@/lib/personalization/scoring";
 import { formatSignalValue, SIGNAL_LABEL_MAP } from "@/lib/prompt-intel/format";
 import type { PromptSignalSource, PromptSignals } from "@/lib/prompt-intel/types";
-import { isPropertyGuruPreset } from "@/lib/config/presets";
 import type {
   PropertyGuruLifestyleCue,
   PropertyGuruMoveInHorizon,
   PropertyGuruSignals,
   PropertyGuruTonePreset,
 } from "@/lib/types/property-guru";
-import { DEFAULT_PROPERTY_GURU_SIGNALS } from "@/lib/utils/property-guru-signals";
-import type { PropertyGuruSearchPayload } from "@/lib/utils/property-guru-plan-mapper";
 import { cn } from "@/lib/utils";
+import type { PropertyGuruSearchPayload } from "@/lib/utils/property-guru-plan-mapper";
+import { DEFAULT_PROPERTY_GURU_SIGNALS } from "@/lib/utils/property-guru-signals";
 
 interface CustomizeDrawerProps {
   open: boolean;

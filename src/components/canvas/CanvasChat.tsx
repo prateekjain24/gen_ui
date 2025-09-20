@@ -23,6 +23,7 @@ import { canvasCopy } from "@/lib/canvas/copy";
 import type { CanvasRecipe, CanvasRecipeId, RecipeKnobDefinition, RecipeKnobId } from "@/lib/canvas/recipes";
 import { getRecipe } from "@/lib/canvas/recipes";
 import type { SlotValidationIssue } from "@/lib/canvas/template-validator";
+import { isPropertyGuruPreset } from "@/lib/config/presets";
 import { ENV } from "@/lib/constants";
 import { FIELD_IDS } from "@/lib/constants/fields";
 import type { RecipeKnobOverrides, RecipePersonalizationResult } from "@/lib/personalization/scoring";
@@ -34,16 +35,23 @@ import type {
   ToolIdentifier,
 } from "@/lib/prompt-intel/types";
 import type { PropertyGuruPlanTemplate } from "@/lib/property-guru/prompt";
+import { createTelemetryQueue, type TelemetryQueue } from "@/lib/telemetry/events";
+import type { AIAttribution, AIAttributionSignal } from "@/lib/types/ai";
+import type {
+  ButtonAction,
+  Field,
+  FieldOption,
+  FormPlan,
+  IntegrationPickerField,
+  StepperItem,
+} from "@/lib/types/form";
 import type { PropertyGuruSignals } from "@/lib/types/property-guru";
+import { cn } from "@/lib/utils";
 import {
   mapPropertyGuruPlanToSearchPayload,
   type PropertyGuruSearchPayload,
 } from "@/lib/utils/property-guru-plan-mapper";
 import { DEFAULT_PROPERTY_GURU_SIGNALS } from "@/lib/utils/property-guru-signals";
-import { createTelemetryQueue, type TelemetryQueue } from "@/lib/telemetry/events";
-import type { AIAttribution, AIAttributionSignal } from "@/lib/types/ai";
-import type { Field, FieldOption, FormPlan, IntegrationPickerField, StepperItem } from "@/lib/types/form";
-import { cn } from "@/lib/utils";
 
 type CanvasDecisionSource = "llm" | "heuristics";
 
@@ -80,6 +88,8 @@ interface CanvasPlanState extends CanvasPlanResponse {
   fields: Field[];
   formPlan: FormPlan;
 }
+
+const PROPERTY_GURU_PRESET_ENABLED = isPropertyGuruPreset();
 
 const personaCopy: Record<CanvasPlanResponse["persona"], { title: string; description: string; stepLabel: string }> = {
   explorer: {
@@ -987,6 +997,73 @@ export function CanvasChat({ personalizationEnabled = true }: CanvasChatProps): 
     });
   }, []);
 
+  const handleFormAction = React.useCallback(
+    (action: ButtonAction['action']) => {
+      if (!PROPERTY_GURU_PRESET_ENABLED) {
+        return;
+      }
+      if (!ENV.enableCanvasTelemetry) {
+        return;
+      }
+      const queue = telemetryQueueRef.current;
+      if (!queue) {
+        return;
+      }
+      if (!plan) {
+        return;
+      }
+
+      const template = plan.templateCopy;
+      const planTemplate = template.propertyGuruPlan;
+      const signals = template.propertyGuruSignals;
+      const payload = template.propertyGuruSearchPayload;
+
+      if (!planTemplate || !signals || !payload) {
+        return;
+      }
+
+      const defaultsApplied = template.propertyGuruDefaults ?? [];
+      if (plan.formPlan.kind !== 'render_step') {
+        return;
+      }
+
+      const baseEvent = {
+        payload,
+        signals,
+        defaultsApplied,
+        persona: plan.persona,
+      };
+
+      if (action === 'submit_step') {
+        const ctaLabel = plan.formPlan.step.primaryCta.label;
+        queue.enqueue({
+          type: 'property_guru_flow_event',
+          stage: 'cta_clicked',
+          ctaLabel,
+          ...baseEvent,
+        });
+
+        if (ctaLabel.toLowerCase().includes('save')) {
+          queue.enqueue({
+            type: 'property_guru_flow_event',
+            stage: 'saved_search_created',
+            ctaLabel,
+            ...baseEvent,
+          });
+        }
+      }
+
+      if (action === 'complete') {
+        queue.enqueue({
+          type: 'property_guru_flow_event',
+          stage: 'flow_complete',
+          ...baseEvent,
+        });
+      }
+    },
+    [plan]
+  );
+
   const previewItems = React.useMemo(() => {
     if (!plan) {
       return [] as Array<{ id: string; label: string; description: string }>;
@@ -1193,7 +1270,13 @@ export function CanvasChat({ personalizationEnabled = true }: CanvasChatProps): 
               ) : null}
 
               <Card className="border border-border/60 p-4">
-                <FormRenderer key={`${plan.recipeId}-${animationKey}`} plan={plan.formPlan} />
+                <FormRenderer
+                  key={`${plan.recipeId}-${animationKey}`}
+                  plan={plan.formPlan}
+                  onAction={action => {
+                    handleFormAction(action);
+                  }}
+                />
               </Card>
 
               {ENV.isDebug ? (

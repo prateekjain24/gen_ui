@@ -1,4 +1,5 @@
 import type { PromptSignalSummary } from '@/lib/prompt-intel';
+import type { PropertyGuruSignals } from '@/lib/types/property-guru';
 import type { PropertyGuruSearchPayload } from '@/lib/utils/property-guru-plan-mapper';
 /**
  * UX Event Type Definitions
@@ -227,6 +228,22 @@ export interface PropertyGuruPlanPayloadEvent extends BaseEvent {
   type: 'property_guru_plan_payload';
   defaultsApplied: string[];
   payload: PropertyGuruSearchPayload;
+  signals: PropertyGuruSignals;
+  essentials: string[];
+  lifestyleHighlights: string[];
+  primaryCta: string;
+  secondaryCtas: string[];
+}
+
+export interface PropertyGuruFlowEvent extends BaseEvent {
+  type: 'property_guru_flow_event';
+  stage: 'cta_clicked' | 'flow_complete' | 'saved_search_created';
+  ctaLabel?: string;
+  experimentId?: string;
+  persona?: string;
+  payload?: PropertyGuruSearchPayload;
+  signals?: PropertyGuruSignals;
+  defaultsApplied?: string[];
 }
 
 export interface FlowCompleteEvent extends BaseEvent {
@@ -318,6 +335,7 @@ export type UXEvent =
   | FlowAbandonEvent
   | PromptSignalsExtractedEvent
   | PropertyGuruPlanPayloadEvent
+  | PropertyGuruFlowEvent
   | ErrorEvent
   | CanvasPlanRenderedEvent;
 

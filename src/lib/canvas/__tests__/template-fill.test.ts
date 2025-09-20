@@ -121,7 +121,7 @@ describe("renderTemplateCopy", () => {
 
     expect(result.templates[0].values.title).toBe(template.slots[0].fallback);
     expect(result.templates[0].fallbackApplied).toBe(true);
-    expect(result.templates[0].issues.some(issue => issue.reason.includes("invalid_template_json"))).toBe(true);
+    expect(result.templates[0].issues.some(issue => issue.reason.includes("fallback_applied"))).toBe(true);
     expect(result.telemetry[0].cacheStatus).toBe("miss");
   });
 
