@@ -4,7 +4,7 @@ import { generateText } from "ai";
 import { jsonrepair } from "jsonrepair";
 
 import type { CanvasPersona, CanvasRecipeId } from "@/lib/canvas/recipes";
-import { validateTemplateSlots, type SlotValidationIssue } from "@/lib/canvas/template-validator";
+import type { SlotValidationIssue } from "@/lib/canvas/template-validator";
 import { TEMPLATE_CATALOG, TEMPLATE_IDS, type Template, type TemplateId } from "@/lib/canvas/templates";
 import { LLM_CONFIG } from "@/lib/constants";
 import {
@@ -26,6 +26,7 @@ import { createDebugger, debugError } from "@/lib/utils/debug";
 const debug = createDebugger("Canvas:TemplateFill");
 
 const TEMPLATE_TIMEOUT_MS = 30_000;
+const SLOT_TIMEOUT_MS = 8_000;
 
 const TEMPLATE_RETRY: BackoffSettings = {
   maxAttempts: 2,
@@ -186,9 +187,26 @@ export const renderTemplateCopy = async (context: TemplateFillContext): Promise<
       const parsed = parseTemplateResponse(rawResponse);
       parseFailed = !parsed && Boolean(rawResponse);
 
-      for (const { template } of templatesForLLM) {
-        const generatedValues = parsed?.[template.id] ?? {};
-        generatedByTemplate.set(template.id, generatedValues);
+      if (parsed) {
+        for (const { template } of templatesForLLM) {
+          const generatedValues = parsed?.[template.id] ?? {};
+          generatedByTemplate.set(template.id, generatedValues);
+        }
+      }
+
+      if (parseFailed) {
+        await generateSlotFallbacks({
+          context,
+          templates: templatesForLLM,
+          openai,
+        }).then(fallbackValues => {
+          fallbackValues.forEach((values, templateId) => {
+            generatedByTemplate.set(templateId, values);
+          });
+          if (fallbackValues.size > 0) {
+            parseFailed = false;
+          }
+        });
       }
     } catch (error) {
       llmFailed = true;
@@ -205,12 +223,16 @@ export const renderTemplateCopy = async (context: TemplateFillContext): Promise<
       ...(request.existingValues ?? {}),
       ...generatedValues,
     };
-    const validation = validateTemplateSlots(template.id, mergedValues, {
-      allowPartial: shouldRequest ? (!relaxedValidation && !parseFailed ? Boolean(request.partial) : true) : true,
-    });
+    const { values: resolvedValues, fallbackApplied: rawFallbackApplied, issues: valueIssues } = resolveTemplateValues(
+      template,
+      mergedValues,
+      {
+        allowPartial: shouldRequest ? (!relaxedValidation && !parseFailed ? Boolean(request.partial) : true) : true,
+      }
+    );
 
-    let issues = validation.issues;
-    let fallbackApplied = validation.fallbackApplied;
+    let issues = valueIssues;
+    let fallbackApplied = rawFallbackApplied;
 
     if (parseFailed) {
       issues = [
@@ -232,7 +254,7 @@ export const renderTemplateCopy = async (context: TemplateFillContext): Promise<
 
     baseSanitized.push({
       templateId: template.id,
-      values: validation.sanitizedValues,
+      values: resolvedValues,
       issues,
       fallbackApplied,
     });
@@ -241,7 +263,7 @@ export const renderTemplateCopy = async (context: TemplateFillContext): Promise<
       buildTelemetry(
         template.id,
         {
-          sanitizedValues: validation.sanitizedValues,
+          sanitizedValues: resolvedValues,
           issues,
           fallbackApplied,
         },
@@ -252,12 +274,13 @@ export const renderTemplateCopy = async (context: TemplateFillContext): Promise<
     if (
       cacheStatus === "miss" &&
       !fallbackApplied &&
-      issues.length === 0 &&
+      !parseFailed &&
+      !llmFailed &&
       Object.keys(generatedValues).length > 0
     ) {
       const cacheKey = cacheKeyInputs.get(template.id);
       if (cacheKey) {
-        templateCompletionCache.set(cacheKey, validation.sanitizedValues);
+        templateCompletionCache.set(cacheKey, resolvedValues);
       }
     }
   }
@@ -275,6 +298,119 @@ const shouldRequestSlots = (template: Template, request: TemplateFillRequest): b
     return !candidate;
   });
 };
+
+const generateSlotFallbacks = async ({
+  context,
+  templates,
+  openai,
+}: {
+  context: TemplateFillContext;
+  templates: Array<{ template: Template; request: TemplateFillRequest; cacheKey: TemplateCacheKeyInput }>;
+  openai: ReturnType<typeof getOpenAIProvider> | null;
+}): Promise<Map<TemplateId, Record<string, string>>> => {
+  const fallbackValues = new Map<TemplateId, Record<string, string>>();
+  if (!openai) {
+    return fallbackValues;
+  }
+
+  for (const { template } of templates) {
+    const slotValues: Record<string, string> = {};
+    for (const slot of template.slots) {
+      try {
+        const prompt = buildSlotPrompt(context, template, slot);
+        const result = await withTimeout(
+          signal =>
+            generateText({
+              model: openai(LLM_CONFIG.model),
+              system: SLOT_SYSTEM_PROMPT,
+              prompt,
+              maxOutputTokens: Math.min(180, LLM_CONFIG.maxTokens / 4),
+              abortSignal: signal,
+              maxRetries: 0,
+            }),
+          { timeoutMs: SLOT_TIMEOUT_MS }
+        );
+        const cleaned = result.text?.trim() ?? "";
+        if (cleaned) {
+          slotValues[slot.id] = cleaned;
+        }
+      } catch (error) {
+        debugError("Slot fallback generation failed", error, { templateId: template.id, slotId: slot.id });
+      }
+    }
+    if (Object.keys(slotValues).length > 0) {
+      fallbackValues.set(template.id, slotValues);
+    }
+  }
+
+  return fallbackValues;
+};
+
+const resolveTemplateValues = (
+  template: Template,
+  candidateValues: Record<string, string>,
+  options: { allowPartial?: boolean } = {}
+): {
+  values: Record<string, string>;
+  fallbackApplied: boolean;
+  issues: SlotValidationIssue[];
+} => {
+  const allowPartial = options.allowPartial ?? false;
+  const values: Record<string, string> = {};
+  const issues: SlotValidationIssue[] = [];
+  let fallbackApplied = false;
+
+  template.slots.forEach(slot => {
+    const rawValue = candidateValues[slot.id];
+    const trimmed = typeof rawValue === "string" ? rawValue.trim() : "";
+
+    if (trimmed) {
+      values[slot.id] = normalizeWhitespace(trimmed);
+      return;
+    }
+
+    if (allowPartial && slot.required) {
+      values[slot.id] = "";
+      issues.push({ slotId: slot.id, reason: "partial_missing", severity: "warning" });
+      return;
+    }
+
+    if (slot.fallback) {
+      values[slot.id] = slot.fallback;
+      fallbackApplied = true;
+      issues.push({ slotId: slot.id, reason: "fallback_applied", severity: "warning" });
+      return;
+    }
+
+    values[slot.id] = "";
+    issues.push({ slotId: slot.id, reason: "missing_value", severity: "warning" });
+  });
+
+  return { values, fallbackApplied, issues };
+}; 
+
+const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, " ").trim();
+
+const buildSlotPrompt = (
+  context: TemplateFillContext,
+  template: Template,
+  slot: (typeof template)["slots"][number]
+): string => {
+  const signalsSummary = summarizeSignals(context.signals);
+  const parts: string[] = [];
+  parts.push(`Persona: ${context.persona}`);
+  parts.push(`Recipe: ${context.recipeId}`);
+  parts.push(`Slot: ${slot.label} (${slot.description})`);
+  parts.push(`Tone: ${slot.tone}`);
+  parts.push(`MaxLength: ${slot.maxLength}`);
+  parts.push(`Signals: teamSize=${signalsSummary.teamSize}, tools=${signalsSummary.tools.join(", ")}, objective=${signalsSummary.objective}`);
+  parts.push(
+    `Write a single concise line (<= ${slot.maxLength} characters) suitable for the UI. Respond with only the text, no labels or quotation marks.`
+  );
+  return parts.join("\n");
+};
+
+const SLOT_SYSTEM_PROMPT = `You generate short UI strings for a product setup flow. Keep responses direct, actionable, and free of extra commentary.`;
 
 const buildTemplatePrompt = (
   context: TemplateFillContext,
@@ -333,7 +469,13 @@ const parseTemplateResponse = (raw: string | null): Record<TemplateId, Record<st
     return null;
   }
 
-  const cleaned = trimmed.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+  let cleaned = trimmed.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+  }
 
   const attempt = (candidate: string) => {
     try {

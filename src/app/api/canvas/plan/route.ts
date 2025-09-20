@@ -1,4 +1,4 @@
-import { generateText } from "ai";
+import { generateObject, generateText } from "ai";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -6,9 +6,7 @@ import { classifyByHeuristics } from "@/lib/canvas/heuristics";
 import { CANVAS_CLASSIFIER_SYSTEM_PROMPT, buildCanvasClassifierPrompt } from "@/lib/canvas/prompt";
 import type { CanvasRecipeId } from "@/lib/canvas/recipes";
 import { getRecipe } from "@/lib/canvas/recipes";
-import { renderTemplateCopy, type RenderedTemplate } from "@/lib/canvas/template-fill";
 import type { SlotValidationIssue } from "@/lib/canvas/template-validator";
-import type { TemplateId } from "@/lib/canvas/templates";
 import { LLM_CONFIG } from "@/lib/constants";
 import {
   getOpenAIProvider,
@@ -30,6 +28,7 @@ import { createDebugger, debugError } from "@/lib/utils/debug";
 export const runtime = "nodejs";
 
 const log = createDebugger("CanvasPlanAPI");
+const copyLog = createDebugger("CanvasPlanCopy");
 
 const requestSchema = z
   .object({
@@ -434,21 +433,15 @@ export async function POST(req: NextRequest) {
     const promptSignals = await buildPromptSignals(message);
     const personalization = scoreRecipeKnobs(responsePayload.recipeId, promptSignals);
 
-    const templateFill = await renderTemplateCopy({
+    const planCopy = await generatePlanCopy({
+      message,
       recipeId: responsePayload.recipeId,
       persona: responsePayload.persona,
       signals: promptSignals,
-      knobOverrides: personalization.overrides,
-      requests: [
-        { templateId: "step_title" },
-        { templateId: "helper_text" },
-        { templateId: "cta_primary" },
-        { templateId: "callout_info" },
-        { templateId: "badge_caption" },
-      ],
+      overrides: personalization.overrides,
     });
 
-    const templateCopy = buildTemplatePayload(templateFill.templates);
+    const templateCopy = planCopy.copy;
     const responsePayloadWithSignals: CanvasDecisionResponse = {
       ...responsePayload,
       promptSignals,
@@ -488,7 +481,7 @@ export async function POST(req: NextRequest) {
       llmRawResponse: rawLlmResponse,
       rawDecision: llmResult?.decision ?? null,
       personalizationFallback: personalization.fallback,
-      templateTelemetry: templateFill.telemetry,
+      templateTelemetry: [],
     });
 
     trackPersonalizationSuccess();
@@ -503,32 +496,113 @@ export async function POST(req: NextRequest) {
   }
 }
 
-const buildTemplatePayload = (templates: RenderedTemplate[]): TemplateCopyPayload => {
-  const map = new Map<TemplateId, RenderedTemplate>();
-  templates.forEach(template => {
-    map.set(template.templateId, template);
-  });
+const PLAN_COPY_SYSTEM_PROMPT = `You are the UI copywriter for a product setup flow. Respond ONLY with a JSON object containing concise strings.`;
 
-  const stepTitle = map.get("step_title");
-  const helper = map.get("helper_text");
-  const cta = map.get("cta_primary");
-  const callout = map.get("callout_info");
-  const badge = map.get("badge_caption");
+const copySchema = z.object({
+  stepTitle: z.string().min(1),
+  helperText: z.string().min(1),
+  primaryCta: z.string().min(1),
+  calloutHeading: z.string().min(1),
+  calloutBody: z.string().min(1),
+  badgeCaption: z.string().min(1),
+});
 
-  const aggregatedIssues: SlotValidationIssue[] = [];
-  templates.forEach(template => {
-    aggregatedIssues.push(...template.issues);
-  });
+const PLAN_COPY_TIMEOUT_MS = 25_000;
 
-  return {
-    stepTitle: stepTitle?.values.title ?? "Workspace setup",
-    helperText: helper?.values.body ?? "Keep it lightweight so you can dive in immediately.",
-    primaryCta: cta?.values.label ?? "Continue",
-    callout: {
-      heading: callout?.values.heading,
-      body: callout?.values.body ?? "We'll start simple. You can add more later.",
-    },
-    badgeCaption: badge?.values.caption ?? "AI recommended",
-    issues: aggregatedIssues,
-  };
+const generatePlanCopy = async ({
+  message,
+  recipeId,
+  persona,
+  signals,
+  overrides,
+}: {
+  message: string;
+  recipeId: CanvasRecipeId;
+  persona: CanvasDecisionResponse["persona"];
+  signals: PromptSignals;
+  overrides: RecipePersonalizationResult["overrides"];
+}): Promise<{ copy: TemplateCopyPayload }> => {
+  const openaiApiKey = process.env.OPENAI_API_KEY;
+  const defaults = getDefaultCopy();
+
+  if (!openaiApiKey) {
+    return { copy: defaults };
+  }
+
+  const openai = getOpenAIProvider();
+  const prompt = buildCopyPrompt({ message, recipeId, persona, signals, overrides });
+
+  try {
+    const { object, usage } = await withTimeout(
+      signal =>
+        generateObject({
+          model: openai(LLM_CONFIG.model),
+          system: PLAN_COPY_SYSTEM_PROMPT,
+          prompt,
+          schema: copySchema,
+          abortSignal: signal,
+          maxRetries: 1,
+        }),
+      { timeoutMs: PLAN_COPY_TIMEOUT_MS }
+    );
+
+    recordLLMUsage(usage);
+
+    const copy: TemplateCopyPayload = {
+      stepTitle: object.stepTitle.trim() || defaults.stepTitle,
+      helperText: object.helperText.trim() || defaults.helperText,
+      primaryCta: object.primaryCta.trim() || defaults.primaryCta,
+      callout: {
+        heading: object.calloutHeading.trim() || defaults.callout.heading,
+        body: object.calloutBody.trim() || defaults.callout.body,
+      },
+      badgeCaption: object.badgeCaption.trim() || defaults.badgeCaption,
+      issues: [],
+    };
+
+    return { copy };
+  } catch (error) {
+    debugError("Plan copy generation failed", error);
+    copyLog("Generation error", { message, recipeId, persona });
+    return {
+      copy: { ...defaults, issues: [{ slotId: "*", reason: "copy_generation_failed", severity: "warning" }] },
+    };
+  }
 };
+
+const buildCopyPrompt = ({
+  message,
+  recipeId,
+  persona,
+  signals,
+  overrides,
+}: {
+  message: string;
+  recipeId: CanvasRecipeId;
+  persona: CanvasDecisionResponse["persona"];
+  signals: PromptSignals;
+  overrides: RecipePersonalizationResult["overrides"];
+}): string => {
+  const summary = {
+    message,
+    recipeId,
+    persona,
+    signals: summarizePromptSignals(signals),
+    overrides,
+  };
+
+  return `Context: ${JSON.stringify(summary, null, 2)}\n\nReturn JSON with these keys:\n{\n  "stepTitle": string,\n  "helperText": string,\n  "primaryCta": string,\n  "calloutHeading": string,\n  "calloutBody": string,\n  "badgeCaption": string\n}\nEach value must be under 160 characters and actionable. Do not add commentary or extra fields.`;
+};
+
+
+const getDefaultCopy = (): TemplateCopyPayload => ({
+  stepTitle: "Workspace setup",
+  helperText: "Keep it lightweight so you can dive in immediately.",
+  primaryCta: "Continue",
+  callout: {
+    heading: "A quick heads-up",
+    body: "We'll start simple. You can add more later.",
+  },
+  badgeCaption: "AI recommended",
+  issues: [],
+});
