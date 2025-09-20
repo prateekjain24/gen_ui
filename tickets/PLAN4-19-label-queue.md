@@ -4,26 +4,27 @@
 - **Depends on:** PLAN4-18
 
 ## Goal
-Set up a lightweight label queue allowing PMs/ops to review personalization telemetry and approve new heuristics or template examples.
+Expose an on-box, in-memory review list that product can read while the app runs on Railway—no external queues or data exports.
 
 ## Context
-Phase 4’s learning loop depends on human oversight. The queue organizes raw telemetry into actionable review tasks.
+With the MVP telemetry writing JSONL files, we just need a quick way to mark “interesting” edits during a reviewing session. A lightweight in-memory queue behind a feature flag keeps the footprint tiny and resets automatically on redeploy.
 
 ## Requirements
-1. Create a script (`scripts/telemetry/export-plan-edits.ts`) that reads recent telemetry logs and groups edits by signal/knob combination.
-2. Output a JSON or CSV file suitable for Airtable/Sheets ingestion, including counts, sample prompts, and recommended actions.
-3. Provide a README (`docs/feedback-loop.md`) detailing how to run the export, review entries, and feed approvals back.
-4. Ensure the script supports filters (date range, persona, recipe) via CLI args.
-5. Cover happy-path execution with a unit test or integration test using fixture telemetry files.
+1. Add `src/lib/labeling/memory-queue.ts` exporting `pushLabelCandidate`, `listLabelCandidates`, and `clearLabelCandidates` functions backed by an array.
+2. Gate usage behind a single environment toggle (`ENABLE_LABELING_REVIEW`); when false the helpers become no-ops.
+3. Register a Next.js route handler (e.g. `app/api/labeling/route.ts`) that supports `POST` to enqueue candidates and `GET` to read the current list as JSON.
+4. For MVP grouping, pipe events straight through—store the payload from `recordPlanEdit` plus a `notes` field supplied by the caller.
+5. Document the manual review workflow: start the dev server, hit the GET endpoint, and copy the JSON into a Railway log note or spreadsheet if needed.
 
 ## Implementation Steps
-1. Define the data schema for label items (id, signals, knob, occurrence count, sample entries).
-2. Implement the export script leveraging existing telemetry storage (JSONL).
-3. Add CLI parsing for filters and file paths.
-4. Write tests using sample telemetry logs placed under `src/lib/telemetry/__fixtures__`.
-5. Draft the README with step-by-step review instructions.
+1. Implement the queue module with simple Array storage and a max length (default 50) to prevent runaway memory usage.
+2. Wire the API route to reject requests if `ENABLE_LABELING_REVIEW` is disabled; otherwise convert the body to the queue shape and append.
+3. Add a minimal `scripts/labeling/print-current.ts` helper that fetches the GET endpoint and pretty-prints the items.
+4. Update `docs/telemetry-notes.md` (or the existing demo script) to include instructions and sample `curl` commands.
+5. Include a unit test that ensures the queue respects the max length and clears correctly.
 
 ## Definition of Done
-- Export script generates label queue files with grouping and filters.
-- Tests cover sample telemetry and CLI usage.
-- Documentation explains the workflow and next steps after review.
+- The in-memory queue exists, is protected by the env toggle, and exposes GET/POST handlers.
+- Queue items survive for the life of the process and reset naturally on Railway restarts.
+- A helper script and docs show reviewers how to capture the current queue snapshot.
+- No external storage, workers, or export pipelines are introduced.

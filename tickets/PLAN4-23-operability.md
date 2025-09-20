@@ -4,26 +4,25 @@
 - **Depends on:** PLAN4-21, PLAN4-22
 
 ## Goal
-Document runbooks, red-team scenarios, and mitigation guidance so operators can support the more dynamic Phase 4 personalization features.
+Produce a concise Railway-first runbook so anyone can deploy, monitor, and pause Phase 4 personalization without extra tooling.
 
 ## Context
-Safety is a core principle. Comprehensive documentation ensures on-call engineers and PMs know how to respond to ambiguous prompts, regulated industries, or feature toggling needs.
+We do not have dedicated SRE coverage for MVP. Documentation must lean on built-in Railway logs, the new toggles, and the JSONL telemetry file—leaving anything heavier to a future phase.
 
 ## Requirements
-1. Create `docs/operability/phase4-runbook.md` describing key workflows: enabling/disabling toggles, clearing caches, interpreting telemetry alerts.
-2. Add a red-team appendix outlining at least five risky prompt scenarios (regulated industries, malicious content, contradictory requests) with mitigation steps.
-3. Document circuits/caches introduced in PLAN4-22/13 and how to reset them without downtime.
-4. Include escalation paths and SLA expectations for personalization outages.
-5. Review the runbook with ops/PM stakeholders and capture sign-off notes in the doc.
+1. Create `docs/operability/railway-phase4.md` covering: required env vars, deploy command (`railway up`), how to check container health, and how to disable personalization via env variables.
+2. Include a “Quick Triage” checklist using the runtime policies from PLAN4-22 (what to do when rate limits hit or the soft-disable triggers).
+3. Capture three red-team prompts relevant to MVP (regulated finance request, conflicting persona signals, malicious jab) and outline how to respond using existing toggles/logs.
+4. Add a short section on exporting the JSONL log (download via Railway or `railway run cat data/plan-edits.jsonl`) for audit.
+5. End with escalation guidance: who to ping, expected response window during MVP (e.g. “within next business day”), and how to roll back to Phase 3 behavior.
 
 ## Implementation Steps
-1. Gather context from previous phases and new features (toggles, cache, telemetry).
-2. Draft the runbook with clear headings, step-by-step instructions, and checklists.
-3. Append red-team scenarios with detection tips and fallback procedures.
-4. Circulate the draft for feedback and integrate responses.
+1. Draft the markdown with headings: Deployment, Monitoring, Incident Response, Red-Team Notes, Escalation.
+2. Pull in details from PLAN4-18 to PLAN4-22 so instructions reference real filenames and toggles.
+3. Share the doc with the product lead for a quick acknowledgment and record the date in a “Reviewed by” footer.
 
 ## Definition of Done
-- Runbook document exists with operational procedures and red-team scenarios.
-- Mitigation steps cover caches, toggles, and circuit breakers.
-- Stakeholder sign-off recorded in the doc.
-- Content aligns with Phase 4 safety principles.
+- The Railway runbook exists and links directly to toggles, telemetry, and queue scripts.
+- Red-team scenarios reference actual MVP safeguards (no hypothetical tooling).
+- Escalation notes set expectations for MVP support.
+- Future engineers can follow the doc to deploy or pause personalization without guessing.
