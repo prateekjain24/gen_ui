@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { isLabelingReviewEnabled } from "@/lib/config/toggles";
 import { listLabelCandidates, pushLabelCandidate } from "@/lib/labeling/memory-queue";
-import type { LabelCandidate } from "@/lib/labeling/memory-queue";
+import type { LabelCandidateInput } from "@/lib/labeling/types";
 import { createDebugger, debugError } from "@/lib/utils/debug";
 
 const log = createDebugger("LabelingAPI");
-
-const isReviewEnabled = (): boolean => process.env.ENABLE_LABELING_REVIEW === "true";
 
 const planEditSchema = z.object({
   recipeId: z.string().trim().min(1, "Recipe ID is required"),
@@ -25,7 +24,7 @@ const candidateSchema = planEditSchema.extend({
 const disabledResponse = NextResponse.json({ error: "Labeling review is disabled." }, { status: 403 });
 
 export async function GET() {
-  if (!isReviewEnabled()) {
+  if (!isLabelingReviewEnabled()) {
     return disabledResponse;
   }
 
@@ -38,7 +37,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  if (!isReviewEnabled()) {
+  if (!isLabelingReviewEnabled()) {
     return disabledResponse;
   }
 
@@ -60,11 +59,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const payload: LabelCandidate = parsed.data;
+  const payload: LabelCandidateInput = parsed.data;
 
   try {
-    pushLabelCandidate(payload);
-    log("Queued labeling candidate for %s", payload.recipeId);
+    const queued = pushLabelCandidate(payload);
+    if (queued) {
+      log("Queued labeling candidate for %s", payload.recipeId);
+    }
   } catch (error) {
     debugError("Failed to queue labeling candidate", error);
     return NextResponse.json({ error: "Failed to queue labeling candidate" }, { status: 500 });

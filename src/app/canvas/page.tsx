@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { CanvasChat } from "@/components/canvas/CanvasChat";
+import { isPersonalizationEnabled } from "@/lib/config/toggles";
 
 export const metadata: Metadata = {
   title: "Canvas Chat",
@@ -8,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function CanvasPage() {
-  return <CanvasChat />;
+  return <CanvasChat personalizationEnabled={isPersonalizationEnabled()} />;
 }

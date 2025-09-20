@@ -57,6 +57,7 @@ Phase 4 transforms the canvas planner from a rules-heavy demo into a genuinely a
 ### 6. Platform & Safety Readiness
 **Goal:** Keep the system reliable and governable as customization increases.
 - Add environment toggles for prompt intelligence, personalization engine, and template overrides.
+- Document runtime toggles (`ENABLE_PROMPT_INTEL`, `ENABLE_PERSONALIZATION`, `ENABLE_LABELING_REVIEW`) with Railway defaults (true/true/false).
 - Introduce rate limiting and timeout policies tuned for richer LLM usage (e.g., 30s classifier timeout, higher context window models).
 - Document red-team scenarios (ambiguous prompts, regulated industries) with mitigation guidance.
 - Deliverable: Updated `.env.local.example`, runbooks in `docs/operability/`, and alerting hooks.

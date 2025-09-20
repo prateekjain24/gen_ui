@@ -350,7 +350,11 @@ const buildFormPlan = (
   };
 };
 
-export function CanvasChat(): React.ReactElement {
+interface CanvasChatProps {
+  personalizationEnabled?: boolean;
+}
+
+export function CanvasChat({ personalizationEnabled = true }: CanvasChatProps): React.ReactElement {
   const [prompt, setPrompt] = React.useState("");
   const [submittedPrompt, setSubmittedPrompt] = React.useState<string | null>(null);
   const [plan, setPlan] = React.useState<CanvasPlanState | null>(null);
@@ -667,7 +671,7 @@ export function CanvasChat(): React.ReactElement {
                   <span className="text-xs uppercase tracking-wide text-muted-foreground/80">
                     Decision source: {plan.decisionSource === "llm" ? "LLM recommendation" : "Heuristics fallback"}
                   </span>
-                  {plan.personalization.fallback.applied ? (
+                  {plan.personalization.fallback.applied && personalizationEnabled ? (
                     <span className="text-xs text-amber-600 dark:text-amber-400">
                       Personalization fallback triggered ({plan.personalization.fallback.reasons.join(", ")}). You can tweak the fields below manually.
                     </span>
@@ -686,24 +690,26 @@ export function CanvasChat(): React.ReactElement {
                 </div>
               </div>
 
-              <div className="hidden items-center justify-end gap-3 lg:flex">
-                <span className="text-xs text-muted-foreground">
-                  Fine-tune copy, approvals, and invites for this plan.
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCustomizeOpen(true)}
-                  aria-haspopup="dialog"
-                  aria-expanded={isCustomizeOpen}
-                  disabled={!plan}
-                  className="inline-flex items-center gap-2"
-                >
-                  <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  Customize
-                </Button>
-              </div>
+              {personalizationEnabled ? (
+                <div className="hidden items-center justify-end gap-3 lg:flex">
+                  <span className="text-xs text-muted-foreground">
+                    Fine-tune copy, approvals, and invites for this plan.
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCustomizeOpen(true)}
+                    aria-haspopup="dialog"
+                    aria-expanded={isCustomizeOpen}
+                    disabled={!plan}
+                    className="inline-flex items-center gap-2"
+                  >
+                    <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    Customize
+                  </Button>
+                </div>
+              ) : null}
 
               {previewItems.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2">
@@ -737,14 +743,16 @@ export function CanvasChat(): React.ReactElement {
           ) : null}
         </section>
       </div>
-      <CustomizeDrawer
-        open={isCustomizeOpen}
-        onOpenChange={setCustomizeOpen}
-        recipeId={plan?.recipeId}
-        promptSignals={plan?.promptSignals}
-        knobOverrides={plan?.personalization.overrides}
-        previewCopy={plan?.templateCopy}
-      />
+      {personalizationEnabled ? (
+        <CustomizeDrawer
+          open={isCustomizeOpen}
+          onOpenChange={setCustomizeOpen}
+          recipeId={plan?.recipeId}
+          promptSignals={plan?.promptSignals}
+          knobOverrides={plan?.personalization.overrides}
+          previewCopy={plan?.templateCopy}
+        />
+      ) : null}
     </main>
   );
 }

@@ -115,6 +115,9 @@ bun run dev
 | `OPENAI_MODEL` | LLM model ID | `gpt-5-mini` |
 | `LLM_PROMPT_VERSION` | Prompt version string for eval logging | `phase4-alpha` |
 | `ENABLE_LLM_ORCHESTRATION` | “false” to force heuristics | `true` |
+| `ENABLE_PROMPT_INTEL` | Toggle keyword/LLM signal extraction | `true` |
+| `ENABLE_PERSONALIZATION` | Toggle knob scoring + customize drawer | `true` |
+| `ENABLE_LABELING_REVIEW` | Enable in-memory labeling queue + CLI tools | `false` |
 | `EVAL_LOG_DIR` | Directory for JSONL eval logs | `eval/logs` |
 
 ### Useful Scripts

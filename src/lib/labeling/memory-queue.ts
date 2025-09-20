@@ -1,34 +1,36 @@
-import type { PlanEditTelemetryPayload } from "@/lib/telemetry/plan-edits";
+import { randomUUID } from "node:crypto";
 
-export interface LabelCandidate extends PlanEditTelemetryPayload {
-  notes: string;
-}
+import type { LabelCandidateInput, LabelQueueItem } from "./types";
+
+import { isLabelingReviewEnabled } from "@/lib/config/toggles";
 
 const MAX_QUEUE_LENGTH = 50;
 
-let queue: LabelCandidate[] = [];
+let queue: LabelQueueItem[] = [];
 
-const isLabelingEnabled = (): boolean => process.env.ENABLE_LABELING_REVIEW === "true";
-
-const normalizeCandidate = (candidate: LabelCandidate): LabelCandidate => ({
+const normalizeCandidate = (candidate: LabelCandidateInput): LabelQueueItem => ({
   ...candidate,
+  id: randomUUID(),
   timestamp: candidate.timestamp ?? new Date().toISOString(),
 });
 
-export function pushLabelCandidate(candidate: LabelCandidate): void {
-  if (!isLabelingEnabled()) {
-    return;
+export function pushLabelCandidate(candidate: LabelCandidateInput): LabelQueueItem | null {
+  if (!isLabelingReviewEnabled()) {
+    return null;
   }
 
-  queue = queue.concat(normalizeCandidate(candidate));
+  const normalized = normalizeCandidate(candidate);
+  queue = queue.concat(normalized);
 
   if (queue.length > MAX_QUEUE_LENGTH) {
     queue = queue.slice(queue.length - MAX_QUEUE_LENGTH);
   }
+
+  return normalized;
 }
 
-export function listLabelCandidates(): LabelCandidate[] {
-  if (!isLabelingEnabled()) {
+export function listLabelCandidates(): LabelQueueItem[] {
+  if (!isLabelingReviewEnabled()) {
     return [];
   }
 

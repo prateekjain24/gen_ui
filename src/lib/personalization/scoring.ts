@@ -6,6 +6,7 @@ import type {
   RecipeEnumKnobDefinition,
 } from "@/lib/canvas/recipes";
 import { getRecipe } from "@/lib/canvas/recipes";
+import { isPersonalizationEnabled } from "@/lib/config/toggles";
 import type {
   CopyTone,
   PromptSignalMetadata,
@@ -31,7 +32,8 @@ export type RecipeKnobOverrides = Record<RecipeKnobId, RecipeKnobOverrideResult>
 export type PersonalizationFallbackReason =
   | "insufficient_confidence"
   | "conflict_governance_vs_fast"
-  | "conflict_solo_vs_team";
+  | "conflict_solo_vs_team"
+  | "feature_disabled";
 
 export interface PersonalizationFallbackMeta {
   applied: boolean;
@@ -63,6 +65,19 @@ export function scoreRecipeKnobs(
   signals: PromptSignals
 ): RecipePersonalizationResult {
   const recipe = getRecipe(recipeId);
+
+  if (!isPersonalizationEnabled()) {
+    const note = "Personalization disabled via runtime toggle.";
+    return {
+      overrides: createDefaultOverrides(recipe, note),
+      fallback: {
+        applied: true,
+        reasons: ["feature_disabled"],
+        aggregateConfidence: 0,
+        details: [note],
+      },
+    };
+  }
   const context = createPersonalizationContext();
 
   const conflicts = detectConflicts(signals);

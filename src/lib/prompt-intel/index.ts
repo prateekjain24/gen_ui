@@ -8,6 +8,7 @@ import type {
   PromptSignalsPartial,
 } from './types';
 
+import { isPromptIntelEnabled } from '@/lib/config/toggles';
 import { createDebugger } from '@/lib/utils/debug';
 
 const debug = createDebugger('PromptIntel:Merger');
@@ -32,6 +33,10 @@ export async function buildPromptSignals(
   prompt: string,
   options: BuildPromptSignalsOptions = {}
 ): Promise<PromptSignals> {
+  if (!isPromptIntelEnabled()) {
+    return createDefaultSignals();
+  }
+
   const threshold = clampConfidence(
     options.llmConfidenceThreshold ?? DEFAULT_LLM_CONFIDENCE_THRESHOLD
   );

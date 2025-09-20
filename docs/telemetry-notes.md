@@ -39,3 +39,9 @@ On Railway, swap the base URL for the deployed hostname or use `railway run curl
 - The queue keeps the 50 most recent entries and silently drops older ones to avoid unbounded memory use.
 - When the feature flag is false, the API responds with `403` and the helpers become no-ops.
 - `POST /api/labeling` stores the payload emitted by `recordPlanEdit` plus free-form reviewer notes for quick triage.
+
+### Accepting label candidates
+- Pull the latest queue snapshot with `bun scripts/labeling/accept.ts` (or pass `--endpoint` if targeting Railway).
+- The script lists each candidate’s `id`, recipe knob edits, and notes—select entries interactively or pass `--ids=id1,id2` for automation.
+- Accepted entries merge into `config/labeling/accepted.json`; the script emits a bullet summary suitable for release notes.
+- Commit the JSON changes in git so reviewers can diff accepted labels before promoting weight updates.

@@ -4,47 +4,63 @@
 
 import { clearLabelCandidates, listLabelCandidates, pushLabelCandidate } from "../memory-queue";
 
+import { __resetTogglesForTesting } from "@/lib/config/toggles";
+
+const originalEnv = { ...process.env };
+
+const enableQueue = () => {
+  process.env.ENABLE_LABELING_REVIEW = "true";
+  __resetTogglesForTesting();
+};
+
+const disableQueue = () => {
+  delete process.env.ENABLE_LABELING_REVIEW;
+  __resetTogglesForTesting();
+};
+
 describe("memory labeling queue", () => {
-  const originalEnv = process.env.ENABLE_LABELING_REVIEW;
-
-  const createCandidate = (index: number) => ({
-    recipeId: `R${index}`,
-    controlId: "copyTone",
-    previousValue: `prev-${index}`,
-    nextValue: `next-${index}`,
-    signalsSummary: "[]",
-    notes: `Candidate ${index}`,
-  });
-
   beforeEach(() => {
-    process.env.ENABLE_LABELING_REVIEW = "true";
+    Object.assign(process.env, originalEnv);
     clearLabelCandidates();
+    enableQueue();
   });
 
-  afterEach(() => {
-    clearLabelCandidates();
-    if (originalEnv === undefined) {
-      delete process.env.ENABLE_LABELING_REVIEW;
-    } else {
-      process.env.ENABLE_LABELING_REVIEW = originalEnv;
-    }
+  afterAll(() => {
+    Object.assign(process.env, originalEnv);
+    __resetTogglesForTesting();
   });
 
   it("caps the queue at 50 entries and keeps the newest items", () => {
     for (let index = 0; index < 60; index += 1) {
-      pushLabelCandidate(createCandidate(index));
+      pushLabelCandidate({
+        recipeId: `R${index}`,
+        controlId: "copyTone",
+        previousValue: `prev-${index}`,
+        nextValue: `next-${index}`,
+        signalsSummary: "[]",
+        notes: `Candidate ${index}`,
+      });
     }
 
     const stored = listLabelCandidates();
 
     expect(stored).toHaveLength(50);
+    expect(stored.every(candidate => candidate.id && candidate.timestamp)).toBe(true);
+    expect(new Set(stored.map(candidate => candidate.id)).size).toBe(stored.length);
     expect(stored[0]?.recipeId).toBe("R10");
     expect(stored[stored.length - 1]?.recipeId).toBe("R59");
-    expect(stored.every(candidate => candidate.timestamp)).toBe(true);
   });
 
   it("clears the queue when requested", () => {
-    pushLabelCandidate(createCandidate(1));
+    pushLabelCandidate({
+      recipeId: "R1",
+      controlId: "copyTone",
+      previousValue: "prev",
+      nextValue: "next",
+      signalsSummary: "[]",
+      notes: "Candidate",
+    });
+
     expect(listLabelCandidates()).toHaveLength(1);
 
     clearLabelCandidates();
@@ -52,10 +68,17 @@ describe("memory labeling queue", () => {
   });
 
   it("acts as a no-op when labeling is disabled", () => {
-    delete process.env.ENABLE_LABELING_REVIEW;
+    disableQueue();
     clearLabelCandidates();
 
-    pushLabelCandidate(createCandidate(1));
+    pushLabelCandidate({
+      recipeId: "R1",
+      controlId: "copyTone",
+      previousValue: "prev",
+      nextValue: "next",
+      signalsSummary: "[]",
+      notes: "Candidate",
+    });
 
     expect(listLabelCandidates()).toEqual([]);
   });
