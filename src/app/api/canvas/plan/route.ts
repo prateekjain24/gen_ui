@@ -27,12 +27,18 @@ import {
   propertyGuruPlanSchema,
   type PropertyGuruPlanTemplate,
 } from "@/lib/property-guru/prompt";
+import type { PropertyGuruSignals } from "@/lib/types/property-guru";
 import { canProcessRequest, trackFailure, trackPersonalizationSuccess } from "@/lib/runtime/personalization-health";
 import { withTimeout } from "@/lib/runtime/with-timeout";
 import { sessionStore } from "@/lib/store/session";
-import type { PromptSignalsExtractedEvent } from "@/lib/types/events";
+import type { PromptSignalsExtractedEvent, PropertyGuruPlanPayloadEvent } from "@/lib/types/events";
 import { createDebugger, debugError } from "@/lib/utils/debug";
 import { extractPropertyGuruSignals } from "@/lib/utils/property-guru-signals";
+import {
+  mapPropertyGuruPlanToSearchPayload,
+  type PropertyGuruSearchPayload,
+} from "@/lib/utils/property-guru-plan-mapper";
+import { DEFAULT_PROPERTY_GURU_SIGNALS } from "@/lib/utils/property-guru-signals";
 
 export const runtime = "nodejs";
 
@@ -137,6 +143,10 @@ interface TemplateCopyPayload {
   badgeCaption: string;
   issues: SlotValidationIssue[];
   propertyGuruPlan?: PropertyGuruPlanTemplate;
+  propertyGuruSignals?: PropertyGuruSignals;
+  propertyGuruSignalsBaseline?: PropertyGuruSignals;
+  propertyGuruSearchPayload?: PropertyGuruSearchPayload;
+  propertyGuruDefaults?: string[];
 }
 
 type CanvasDecisionResponseBase = Omit<CanvasDecisionResponse, "promptSignals" | "personalization" | "templateCopy">;
@@ -449,6 +459,7 @@ export async function POST(req: NextRequest) {
       persona: responsePayload.persona,
       signals: promptSignals,
       overrides: personalization.overrides,
+      sessionId,
     });
 
     const templateCopy = planCopy.copy;
@@ -527,6 +538,7 @@ const generatePlanCopy = async (options: {
   persona: CanvasDecisionResponse["persona"];
   signals: PromptSignals;
   overrides: RecipePersonalizationResult["overrides"];
+  sessionId?: string;
 }): Promise<{ copy: TemplateCopyPayload }> => {
   if (isPropertyGuruPreset()) {
     return generatePropertyGuruPlanCopy(options);
@@ -644,18 +656,41 @@ const getDefaultPropertyGuruCopy = (): TemplateCopyPayload => ({
   badgeCaption: "AI concierge",
   issues: [],
   propertyGuruPlan: createDefaultPropertyGuruPlan(),
+  propertyGuruSignals: DEFAULT_PROPERTY_GURU_SIGNALS,
+  propertyGuruSignalsBaseline: DEFAULT_PROPERTY_GURU_SIGNALS,
+  propertyGuruSearchPayload: {
+    filters: {
+      area: 'Singapore',
+      districts: [],
+      radiusKm: 5,
+      lifestyle: [],
+      propertyType: 'other',
+      bedrooms: 0,
+    },
+    highlights: [],
+    nextSteps: [],
+    copy: {
+      hero: "Let's refine your home search together.",
+      reassurance: 'Listings refresh daily so you never miss a new opportunity.',
+      followUp: 'We will keep the weekly digest light until you narrow your brief.',
+      tone: 'reassuring',
+    },
+  },
+  propertyGuruDefaults: ['filters.districts', 'filters.price', 'filters.propertyType', 'filters.bedrooms', 'nextSteps'],
 });
 
 const generatePropertyGuruPlanCopy = async ({
   message,
+  sessionId,
 }: {
   message: string;
   recipeId: CanvasRecipeId;
   persona: CanvasDecisionResponse["persona"];
   signals: PromptSignals;
   overrides: RecipePersonalizationResult["overrides"];
+  sessionId?: string;
 }): Promise<{ copy: TemplateCopyPayload }> => {
-  const { signals: propertyGuruSignals } = extractPropertyGuruSignals(message);
+  const { signals: extractedSignals } = extractPropertyGuruSignals(message);
   const defaults = getDefaultPropertyGuruCopy();
   const openaiApiKey = process.env.OPENAI_API_KEY;
 
@@ -664,7 +699,7 @@ const generatePropertyGuruPlanCopy = async ({
   }
 
   const openai = getOpenAIProvider();
-  const prompt = buildPropertyGuruPlanPrompt({ prompt: message, signals: propertyGuruSignals });
+  const prompt = buildPropertyGuruPlanPrompt({ prompt: message, signals: extractedSignals });
 
   try {
     const { object, usage } = await withTimeout(
@@ -683,11 +718,25 @@ const generatePropertyGuruPlanCopy = async ({
     recordLLMUsage(usage);
 
     const plan = propertyGuruPlanSchema.parse(object);
+    const baselineSignals: PropertyGuruSignals = structuredClone(extractedSignals);
+    const { payload, defaultsApplied } = mapPropertyGuruPlanToSearchPayload({
+      plan,
+      signals: extractedSignals,
+    });
+
     const copy: TemplateCopyPayload = {
       ...defaults,
       propertyGuruPlan: plan,
+      propertyGuruSignals: extractedSignals,
+      propertyGuruSignalsBaseline: baselineSignals,
+      propertyGuruSearchPayload: payload,
+      propertyGuruDefaults: defaultsApplied,
       issues: [],
     };
+
+    if (sessionId && defaultsApplied.length > 0) {
+      recordPropertyGuruPayloadEvent(sessionId, defaultsApplied, payload);
+    }
 
     return { copy };
   } catch (error) {
@@ -699,5 +748,27 @@ const generatePropertyGuruPlanCopy = async ({
         issues: [{ slotId: "*", reason: "property_guru_plan_generation_failed", severity: "warning" }],
       },
     };
+  }
+};
+
+const recordPropertyGuruPayloadEvent = (
+  sessionId: string,
+  defaults: string[],
+  payload: PropertyGuruSearchPayload
+) => {
+  const event: PropertyGuruPlanPayloadEvent = {
+    type: 'property_guru_plan_payload',
+    timestamp: new Date().toISOString(),
+    sessionId,
+    defaultsApplied: defaults,
+    payload,
+  };
+
+  const updatedSession = sessionStore.updateSession(sessionId, {
+    event,
+  });
+
+  if (!updatedSession) {
+    log(`No session found for sessionId ${sessionId}; property guru payload telemetry dropped`);
   }
 };

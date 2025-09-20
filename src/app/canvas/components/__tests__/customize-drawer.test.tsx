@@ -8,6 +8,7 @@ import { CustomizeDrawer } from "../customize-drawer";
 
 import type { RecipeKnobOverrides } from "@/lib/personalization/scoring";
 import type { PromptSignals } from "@/lib/prompt-intel/types";
+import { DEFAULT_PROPERTY_GURU_SIGNALS } from "@/lib/utils/property-guru-signals";
 
 const baseKnobs: RecipeKnobOverrides = {
   approvalChainLength: { value: 1, rationale: "default", changedFromDefault: false },
@@ -43,31 +44,69 @@ const previewCopy = {
   issues: [],
 };
 
+const propertyPreviewCopy = {
+  stepTitle: 'Concierge plan preview',
+  helperText: 'Keep things flexible while your concierge refines matches.',
+  primaryCta: 'Preview curated listings',
+  propertyGuruSignals: DEFAULT_PROPERTY_GURU_SIGNALS,
+  propertyGuruSignalsBaseline: DEFAULT_PROPERTY_GURU_SIGNALS,
+  propertyGuruSearchPayload: {
+    filters: {
+      area: DEFAULT_PROPERTY_GURU_SIGNALS.location.primaryArea,
+      districts: DEFAULT_PROPERTY_GURU_SIGNALS.location.districtIds ?? [],
+      radiusKm: DEFAULT_PROPERTY_GURU_SIGNALS.location.radiusKm ?? 5,
+      minPrice: DEFAULT_PROPERTY_GURU_SIGNALS.price.min,
+      maxPrice: DEFAULT_PROPERTY_GURU_SIGNALS.price.max,
+      propertyType: DEFAULT_PROPERTY_GURU_SIGNALS.propertyType,
+      bedrooms: DEFAULT_PROPERTY_GURU_SIGNALS.bedrooms,
+      lifestyle: DEFAULT_PROPERTY_GURU_SIGNALS.lifestyle,
+    },
+    highlights: [],
+    nextSteps: [],
+    copy: {
+      hero: "Let's refine your home search together.",
+      reassurance: 'Listings refresh daily; we will flag new options quickly.',
+      followUp: 'Expect a weekly digest until you dial urgency up.',
+      tone: DEFAULT_PROPERTY_GURU_SIGNALS.tonePreference,
+    },
+  },
+  propertyGuruDefaults: [],
+};
+
+const fetchMock = jest.fn();
+let originalFetch: typeof fetch | undefined;
+let originalPreset: string | undefined;
+
+beforeAll(() => {
+  originalFetch = global.fetch;
+  originalPreset = process.env.NEXT_PUBLIC_CANVAS_PRESET;
+});
+
+beforeEach(() => {
+  fetchMock.mockResolvedValue({
+    ok: true,
+    text: async () => "",
+    statusText: "ok",
+  } as Response);
+  global.fetch = fetchMock as unknown as typeof fetch;
+  process.env.NEXT_PUBLIC_CANVAS_PRESET = 'canvas_mvp';
+});
+
+afterEach(() => {
+  fetchMock.mockReset();
+});
+
+afterAll(() => {
+  global.fetch = originalFetch ?? ((undefined as unknown) as typeof fetch);
+  if (originalPreset === undefined) {
+    delete process.env.NEXT_PUBLIC_CANVAS_PRESET;
+  } else {
+    process.env.NEXT_PUBLIC_CANVAS_PRESET = originalPreset;
+  }
+});
+
 describe("CustomizeDrawer history controls", () => {
   const onOpenChange = jest.fn();
-  const fetchMock = jest.fn();
-  let originalFetch: typeof fetch | undefined;
-
-  beforeAll(() => {
-    originalFetch = global.fetch;
-  });
-
-  beforeEach(() => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      text: async () => "",
-      statusText: "ok",
-    } as Response);
-    global.fetch = fetchMock as unknown as typeof fetch;
-  });
-
-  afterEach(() => {
-    fetchMock.mockReset();
-  });
-
-  afterAll(() => {
-    global.fetch = originalFetch ?? ((undefined as unknown) as typeof fetch);
-  });
 
   const setup = () =>
     render(
@@ -120,5 +159,57 @@ describe("CustomizeDrawer history controls", () => {
 
     fireEvent.click(undoButton);
     await waitFor(() => expect(slider.value).toBe("4"));
+  });
+});
+
+describe('PropertyGuru customize controls', () => {
+  const onOpenChange = jest.fn();
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_CANVAS_PRESET = 'property_guru';
+  });
+
+  afterEach(() => {
+    process.env.NEXT_PUBLIC_CANVAS_PRESET = 'canvas_mvp';
+  });
+
+  it('renders concierge knobs and emits updates', async () => {
+    const onKnobChange = jest.fn();
+
+    render(
+      <CustomizeDrawer
+        open
+        onOpenChange={onOpenChange}
+        recipeId="PG"
+        previewCopy={propertyPreviewCopy}
+        onKnobChange={onKnobChange}
+      />
+    );
+
+    const radiusSlider = screen.getByLabelText(/Location radius/i) as HTMLInputElement;
+    fireEvent.change(radiusSlider, { target: { value: '7' } });
+    await waitFor(() => expect(radiusSlider.value).toBe('7'));
+    await waitFor(() =>
+      expect(onKnobChange).toHaveBeenCalledWith(
+        expect.objectContaining({ preset: 'property_guru', locationRadiusKm: 7 })
+      )
+    );
+
+    const stretchToggle = screen.getByLabelText(/Allow stretch budget/i);
+    fireEvent.click(stretchToggle);
+    await waitFor(() =>
+      expect(onKnobChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ preset: 'property_guru', budgetStretch: true })
+      )
+    );
+
+    const urgencySlider = screen.getByLabelText(/Move-in urgency/i) as HTMLInputElement;
+    fireEvent.change(urgencySlider, { target: { value: '4' } });
+    await waitFor(() => expect(urgencySlider.value).toBe('4'));
+    await waitFor(() =>
+      expect(onKnobChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ preset: 'property_guru', moveInUrgency: 4 })
+      )
+    );
   });
 });

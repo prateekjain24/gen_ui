@@ -18,6 +18,15 @@ import {
 import type { RecipeKnobOverrides } from "@/lib/personalization/scoring";
 import { formatSignalValue, SIGNAL_LABEL_MAP } from "@/lib/prompt-intel/format";
 import type { PromptSignalSource, PromptSignals } from "@/lib/prompt-intel/types";
+import { isPropertyGuruPreset } from "@/lib/config/presets";
+import type {
+  PropertyGuruLifestyleCue,
+  PropertyGuruMoveInHorizon,
+  PropertyGuruSignals,
+  PropertyGuruTonePreset,
+} from "@/lib/types/property-guru";
+import { DEFAULT_PROPERTY_GURU_SIGNALS } from "@/lib/utils/property-guru-signals";
+import type { PropertyGuruSearchPayload } from "@/lib/utils/property-guru-plan-mapper";
 import { cn } from "@/lib/utils";
 
 interface CustomizeDrawerProps {
@@ -26,20 +35,38 @@ interface CustomizeDrawerProps {
   recipeId?: string;
   promptSignals?: PromptSignals;
   knobOverrides?: RecipeKnobOverrides;
-  previewCopy?: {
-    stepTitle?: string;
-    helperText?: string;
-    primaryCta?: string;
-  };
+  previewCopy?: CustomizePreviewCopy;
   onKnobChange?: (state: DrawerKnobState) => void;
 }
 
-export interface DrawerKnobState {
-  approvalChainLength: number;
-  integrationMode: string;
-  copyTone: string;
-  inviteStrategy: "immediate" | "staggered";
+export interface CustomizePreviewCopy {
+  stepTitle?: string;
+  helperText?: string;
+  primaryCta?: string;
+  callout?: {
+    heading?: string;
+    body?: string;
+  };
+  badgeCaption?: string;
+  propertyGuruSignals?: PropertyGuruSignals;
+  propertyGuruSignalsBaseline?: PropertyGuruSignals;
+  propertyGuruSearchPayload?: PropertyGuruSearchPayload;
+  issues?: Array<{ slotId?: string; reason?: string; severity?: string }>;
 }
+
+type CanvasPlanEditControlId =
+  | 'approvalChainLength'
+  | 'integrationMode'
+  | 'copyTone'
+  | 'inviteStrategy';
+
+type PropertyGuruPlanEditControlId =
+  | 'locationRadiusKm'
+  | 'budgetStretch'
+  | 'moveInUrgency'
+  | 'tonePreference';
+
+type PlanEditControlId = CanvasPlanEditControlId | PropertyGuruPlanEditControlId | 'undo' | 'reset';
 
 interface SignalDescriptor {
   id: string;
@@ -49,8 +76,6 @@ interface SignalDescriptor {
   source: PromptSignalSource;
 }
 
-type PlanEditControlId = keyof DrawerKnobState | "undo" | "reset";
-
 interface PlanEditLogPayload {
   recipeId: string;
   controlId: PlanEditControlId;
@@ -59,42 +84,180 @@ interface PlanEditLogPayload {
   signalsSummary: string;
 }
 
-const isSameKnobState = (a: DrawerKnobState, b: DrawerKnobState): boolean =>
-  a.approvalChainLength === b.approvalChainLength &&
-  a.integrationMode === b.integrationMode &&
-  a.copyTone === b.copyTone &&
-  a.inviteStrategy === b.inviteStrategy;
-
-export const DEFAULT_KNOB_STATE: DrawerKnobState = {
-  approvalChainLength: 1,
-  integrationMode: "multi_tool",
-  copyTone: "collaborative",
-  inviteStrategy: "immediate",
+type CanvasDrawerKnobState = {
+  preset: 'canvas_mvp';
+  approvalChainLength: number;
+  integrationMode: string;
+  copyTone: string;
+  inviteStrategy: 'immediate' | 'staggered';
 };
 
-const FALLBACK_SIGNALS: SignalDescriptor[] = [
+type PropertyGuruDrawerKnobState = {
+  preset: 'property_guru';
+  locationRadiusKm: number;
+  budgetStretch: boolean;
+  moveInUrgency: number;
+  tonePreference: PropertyGuruTonePreset;
+};
+
+export type DrawerKnobState = CanvasDrawerKnobState | PropertyGuruDrawerKnobState;
+
+const isCanvasKnobState = (state: DrawerKnobState): state is CanvasDrawerKnobState =>
+  state.preset === 'canvas_mvp';
+
+const isPropertyGuruKnobState = (state: DrawerKnobState): state is PropertyGuruDrawerKnobState =>
+  state.preset === 'property_guru';
+
+export { isCanvasKnobState, isPropertyGuruKnobState };
+
+const isSameKnobState = (a: DrawerKnobState, b: DrawerKnobState): boolean => {
+  if (a.preset !== b.preset) {
+    return false;
+  }
+
+  if (isCanvasKnobState(a) && isCanvasKnobState(b)) {
+    return (
+      a.approvalChainLength === b.approvalChainLength &&
+      a.integrationMode === b.integrationMode &&
+      a.copyTone === b.copyTone &&
+      a.inviteStrategy === b.inviteStrategy
+    );
+  }
+
+  if (isPropertyGuruKnobState(a) && isPropertyGuruKnobState(b)) {
+    return (
+      a.locationRadiusKm === b.locationRadiusKm &&
+      a.budgetStretch === b.budgetStretch &&
+      a.moveInUrgency === b.moveInUrgency &&
+      a.tonePreference === b.tonePreference
+    );
+  }
+
+  return false;
+};
+
+export const DEFAULT_CANVAS_KNOB_STATE: CanvasDrawerKnobState = {
+  preset: 'canvas_mvp',
+  approvalChainLength: 1,
+  integrationMode: 'multi_tool',
+  copyTone: 'collaborative',
+  inviteStrategy: 'immediate',
+};
+
+export const DEFAULT_KNOB_STATE = DEFAULT_CANVAS_KNOB_STATE;
+
+const FALLBACK_CANVAS_SIGNALS: SignalDescriptor[] = [
   {
-    id: "industry",
-    label: "Industry",
-    value: "SaaS",
+    id: 'industry',
+    label: 'Industry',
+    value: 'SaaS',
     confidence: 0.6,
-    source: "llm",
+    source: 'llm',
   },
   {
-    id: "tone",
-    label: "Copy tone",
-    value: "Collaborative",
+    id: 'tone',
+    label: 'Copy tone',
+    value: 'Collaborative',
     confidence: 0.8,
-    source: "keyword",
+    source: 'keyword',
   },
   {
-    id: "approvals",
-    label: "Approval depth",
-    value: "Dual",
+    id: 'approvals',
+    label: 'Approval depth',
+    value: 'Dual',
     confidence: 0.5,
-    source: "merge",
+    source: 'merge',
   },
 ];
+
+const FALLBACK_PROPERTY_GURU_SIGNALS: SignalDescriptor[] = [
+  {
+    id: 'location',
+    label: 'Location focus',
+    value: 'Singapore core districts',
+    confidence: 0.6,
+    source: 'llm',
+  },
+  {
+    id: 'price',
+    label: 'Budget band',
+    value: 'SGD 1M – 1.4M',
+    confidence: 0.5,
+    source: 'llm',
+  },
+  {
+    id: 'tone',
+    label: 'Tone preset',
+    value: 'Reassuring',
+    confidence: 0.7,
+    source: 'llm',
+  },
+];
+
+const HORIZON_TO_URGENCY_MAP: Record<PropertyGuruMoveInHorizon, number> = {
+  immediate: 5,
+  three_months: 4,
+  six_months: 3,
+  year_plus: 2,
+  flexible: 1,
+  unspecified: 0,
+};
+
+const URGENCY_TO_HORIZON_MAP: Record<number, PropertyGuruMoveInHorizon> = {
+  0: 'unspecified',
+  1: 'flexible',
+  2: 'year_plus',
+  3: 'six_months',
+  4: 'three_months',
+  5: 'immediate',
+};
+
+export const moveInHorizonToUrgency = (horizon: PropertyGuruMoveInHorizon): number =>
+  HORIZON_TO_URGENCY_MAP[horizon] ?? 0;
+
+export const urgencyToMoveInHorizon = (value: number): PropertyGuruMoveInHorizon => {
+  const clamped = Math.min(5, Math.max(0, Math.round(value)));
+  return URGENCY_TO_HORIZON_MAP[clamped];
+};
+
+const describeUrgencyLevel = (value: number): string => {
+  const clamped = Math.min(5, Math.max(0, Math.round(value)));
+  switch (clamped) {
+    case 5:
+      return 'Ready to transact';
+    case 4:
+      return 'Preparing paperwork';
+    case 3:
+      return 'Planning next move';
+    case 2:
+      return 'Exploring timelines';
+    case 1:
+      return 'Browsing ideas';
+    default:
+      return 'Just browsing';
+  }
+};
+
+const clampRadiusKm = (value: number): number => Math.min(10, Math.max(1, Math.round(value)));
+
+const describeTonePreset = (tone: PropertyGuruTonePreset): string => {
+  switch (tone) {
+    case 'data_driven':
+      return 'data-driven';
+    case 'concierge':
+      return 'concierge';
+    default:
+      return 'reassuring';
+  }
+};
+
+const DEFAULT_PROPERTY_GURU_KNOB_STATE: PropertyGuruDrawerKnobState = {
+  preset: 'property_guru',
+  locationRadiusKm: clampRadiusKm(DEFAULT_PROPERTY_GURU_SIGNALS.location.radiusKm ?? 5),
+  budgetStretch: Boolean(DEFAULT_PROPERTY_GURU_SIGNALS.price.stretchOk),
+  moveInUrgency: moveInHorizonToUrgency(DEFAULT_PROPERTY_GURU_SIGNALS.moveInHorizon),
+  tonePreference: DEFAULT_PROPERTY_GURU_SIGNALS.tonePreference,
+};
 
 const SOURCE_ICON: Record<PromptSignalSource, React.ComponentType<{ className?: string }>> = {
   keyword: Search,
@@ -110,41 +273,67 @@ const SOURCE_LABEL: Record<PromptSignalSource, string> = {
 
 const HIGH_CONFIDENCE_THRESHOLD = 0.6;
 
-const formatKnobState = (overrides?: RecipeKnobOverrides): DrawerKnobState => {
+const deriveCanvasKnobState = (overrides?: RecipeKnobOverrides): CanvasDrawerKnobState => {
   if (!overrides) {
-    return DEFAULT_KNOB_STATE;
+    return { ...DEFAULT_CANVAS_KNOB_STATE };
   }
 
-  const next: DrawerKnobState = {
-    approvalChainLength: Number(overrides.approvalChainLength?.value ?? DEFAULT_KNOB_STATE.approvalChainLength),
-    integrationMode: String(overrides.integrationMode?.value ?? DEFAULT_KNOB_STATE.integrationMode),
-    copyTone: String(overrides.copyTone?.value ?? DEFAULT_KNOB_STATE.copyTone),
+  const next: CanvasDrawerKnobState = {
+    preset: 'canvas_mvp',
+    approvalChainLength: Number(
+      overrides.approvalChainLength?.value ?? DEFAULT_CANVAS_KNOB_STATE.approvalChainLength
+    ),
+    integrationMode: String(overrides.integrationMode?.value ?? DEFAULT_CANVAS_KNOB_STATE.integrationMode),
+    copyTone: String(overrides.copyTone?.value ?? DEFAULT_CANVAS_KNOB_STATE.copyTone),
     inviteStrategy:
-      (overrides.inviteStrategy?.value as DrawerKnobState["inviteStrategy"]) ?? DEFAULT_KNOB_STATE.inviteStrategy,
+      (overrides.inviteStrategy?.value as CanvasDrawerKnobState['inviteStrategy']) ??
+      DEFAULT_CANVAS_KNOB_STATE.inviteStrategy,
   };
 
   if (!Number.isFinite(next.approvalChainLength) || next.approvalChainLength < 0) {
-    next.approvalChainLength = DEFAULT_KNOB_STATE.approvalChainLength;
+    next.approvalChainLength = DEFAULT_CANVAS_KNOB_STATE.approvalChainLength;
   }
 
-  if (next.inviteStrategy !== "immediate" && next.inviteStrategy !== "staggered") {
-    next.inviteStrategy = DEFAULT_KNOB_STATE.inviteStrategy;
+  if (next.inviteStrategy !== 'immediate' && next.inviteStrategy !== 'staggered') {
+    next.inviteStrategy = DEFAULT_CANVAS_KNOB_STATE.inviteStrategy;
   }
 
   return next;
 };
 
-const mapSignals = (signals?: PromptSignals): SignalDescriptor[] => {
+const derivePropertyGuruKnobState = (previewCopy?: CustomizePreviewCopy): PropertyGuruDrawerKnobState => {
+  const signals = previewCopy?.propertyGuruSignals ?? DEFAULT_PROPERTY_GURU_SIGNALS;
+  return {
+    preset: 'property_guru',
+    locationRadiusKm: clampRadiusKm(signals.location.radiusKm ?? 5),
+    budgetStretch: Boolean(signals.price.stretchOk),
+    moveInUrgency: moveInHorizonToUrgency(signals.moveInHorizon),
+    tonePreference: signals.tonePreference,
+  };
+};
+
+const derivePropertyGuruBaselineKnobState = (previewCopy?: CustomizePreviewCopy): PropertyGuruDrawerKnobState => {
+  const signals = previewCopy?.propertyGuruSignalsBaseline ?? DEFAULT_PROPERTY_GURU_SIGNALS;
+  return {
+    preset: 'property_guru',
+    locationRadiusKm: clampRadiusKm(signals.location.radiusKm ?? 5),
+    budgetStretch: Boolean(signals.price.stretchOk),
+    moveInUrgency: moveInHorizonToUrgency(signals.moveInHorizon),
+    tonePreference: signals.tonePreference,
+  };
+};
+
+const mapCanvasSignals = (signals?: PromptSignals): SignalDescriptor[] => {
   if (!signals) {
     return [];
   }
 
   const selectedKeys: Array<keyof PromptSignals> = [
-    "industry",
-    "copyTone",
-    "approvalChainDepth",
-    "integrationCriticality",
-    "tools",
+    'industry',
+    'copyTone',
+    'approvalChainDepth',
+    'integrationCriticality',
+    'tools',
   ];
 
   return selectedKeys.reduce<SignalDescriptor[]>((accumulator, key) => {
@@ -161,6 +350,99 @@ const mapSignals = (signals?: PromptSignals): SignalDescriptor[] => {
     });
     return accumulator;
   }, []);
+};
+
+const describeLifestyleCue = (cue: PropertyGuruLifestyleCue): string => {
+  return cue
+    .split('_')
+    .map((segment: string, index: number) => {
+      if (segment === 'mrt') {
+        return 'MRT';
+      }
+      const lower = segment.toLowerCase();
+      const text = lower.charAt(0).toUpperCase() + lower.slice(1);
+      return index === 0 ? text : text.toLowerCase();
+    })
+    .join(' ')
+    .replace('Family friendly', 'Family-friendly')
+    .replace('Move in', 'Move-in');
+};
+
+const mapPropertyGuruSignalDescriptors = (signals?: PropertyGuruSignals): SignalDescriptor[] => {
+  if (!signals) {
+    return [];
+  }
+
+  const descriptors: SignalDescriptor[] = [
+    {
+      id: 'location',
+      label: 'Location focus',
+      value: `${signals.location.primaryArea}${signals.location.radiusKm ? ` · ${signals.location.radiusKm}km radius` : ''}`.trim(),
+      confidence: 0.75,
+      source: 'llm',
+    },
+    {
+      id: 'budget',
+      label: 'Budget band',
+      value: formatCurrencyRange(signals.price.min, signals.price.max, signals.price.stretchOk),
+      confidence: 0.7,
+      source: 'llm',
+    },
+    {
+      id: 'tone',
+      label: 'Tone preset',
+      value: humanizeTone(signals.tonePreference),
+      confidence: 0.65,
+      source: 'llm',
+    },
+  ];
+
+  if (signals.lifestyle.length) {
+    descriptors.push({
+      id: 'lifestyle',
+      label: 'Lifestyle cues',
+      value: signals.lifestyle.map(describeLifestyleCue).join(', '),
+      confidence: 0.6,
+      source: 'llm',
+    });
+  }
+
+  return descriptors;
+};
+
+const formatCurrencyRange = (min?: number, max?: number, stretch?: boolean): string => {
+  if (!min && !max) {
+    return 'Budget to refine';
+  }
+
+  const formatter = new Intl.NumberFormat('en-SG', {
+    style: 'currency',
+    currency: 'SGD',
+    maximumFractionDigits: 0,
+  });
+
+  const minLabel = min ? formatter.format(min) : '';
+  let maxValue = max ?? min;
+  if (maxValue && stretch) {
+    maxValue = Math.round(maxValue * 1.1);
+  }
+  const maxLabel = maxValue ? formatter.format(maxValue) : '';
+
+  if (minLabel && maxLabel) {
+    return stretch ? `${minLabel} – ${maxLabel} (stretch +10%)` : `${minLabel} – ${maxLabel}`;
+  }
+  return minLabel || maxLabel;
+};
+
+const humanizeTone = (tone: PropertyGuruTonePreset): string => {
+  switch (tone) {
+    case 'data_driven':
+      return 'Data-driven';
+    case 'concierge':
+      return 'Concierge';
+    default:
+      return 'Reassuring';
+  }
 };
 
 const summarizeHighConfidenceSignals = (signalDescriptors: SignalDescriptor[]): string => {
@@ -191,14 +473,19 @@ const confidenceClass = (confidence: number): string => {
   return "bg-rose-100 text-rose-700";
 };
 
-export const formatCta = (inviteStrategy: DrawerKnobState["inviteStrategy"], primaryCta?: string): string => {
-  if (primaryCta) {
-    return primaryCta;
+export const formatCta = (state: DrawerKnobState, primaryCta?: string): string => {
+  if (primaryCta?.trim()) {
+    return primaryCta.trim();
   }
-  return inviteStrategy === "immediate" ? "Invite collaborators" : "Schedule invites";
+
+  if (isPropertyGuruKnobState(state)) {
+    return 'Preview curated listings';
+  }
+
+  return state.inviteStrategy === 'immediate' ? 'Invite collaborators' : 'Schedule invites';
 };
 
-const humanize = (value: string): string => value.replace(/_/g, " ").replace(/\b\w/g, char => char.toUpperCase());
+const humanize = (value: string): string => value.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
 
 const focusableSelectors = [
   "a[href]",
@@ -216,19 +503,41 @@ const getFocusableElements = (node: HTMLElement | null): HTMLElement[] => {
   return Array.from(node.querySelectorAll<HTMLElement>(focusableSelectors.join(",")));
 };
 
+const formatCanvasPreviewHelper = (state: CanvasDrawerKnobState): string =>
+  `We will keep the tone ${humanize(state.copyTone).toLowerCase()}, support ${humanize(
+    state.integrationMode
+  ).toLowerCase()} integrations, and require ${state.approvalChainLength} approval${state.approvalChainLength === 1 ? "" : "s"}.`;
+
+const formatPropertyGuruPreviewHelper = (state: PropertyGuruDrawerKnobState): string => {
+  const tone = describeTonePreset(state.tonePreference);
+  const stretch = state.budgetStretch
+    ? 'allowing a 10% stretch when listings are tight'
+    : 'keeping recommendations inside your budget';
+  const urgency = describeUrgencyLevel(state.moveInUrgency).toLowerCase();
+  return `We will search within ${state.locationRadiusKm}km, ${stretch}, and keep the tone ${tone}. Timeline: ${urgency}.`;
+};
+
 export const formatPreviewHelper = (state: DrawerKnobState, helper?: string): string => {
   if (helper?.trim()) {
     return helper.trim();
   }
-  return `We will keep the tone ${humanize(state.copyTone).toLowerCase()}, support ${humanize(
-    state.integrationMode
-  ).toLowerCase()} integrations, and require ${state.approvalChainLength} approval${state.approvalChainLength === 1 ? "" : "s"}.`;
+
+  if (isPropertyGuruKnobState(state)) {
+    return formatPropertyGuruPreviewHelper(state);
+  }
+
+  return formatCanvasPreviewHelper(state);
 };
 
-export const inviteCaption = (state: DrawerKnobState): string =>
-  state.inviteStrategy === "immediate"
-    ? "Invitations are sent as soon as approvals complete."
-    : "Invitations will be staggered after foundational steps are done.";
+export const inviteCaption = (state: DrawerKnobState): string => {
+  if (isPropertyGuruKnobState(state)) {
+    return 'Concierge updates will match your selected tone and urgency.';
+  }
+
+  return state.inviteStrategy === 'immediate'
+    ? 'Invitations are sent as soon as approvals complete.'
+    : 'Invitations will be staggered after foundational steps are done.';
+};
 
 export function CustomizeDrawer({
   open,
@@ -240,7 +549,11 @@ export function CustomizeDrawer({
   onKnobChange,
 }: CustomizeDrawerProps): React.ReactElement | null {
   const drawerRef = React.useRef<HTMLDivElement>(null);
-  const [knobState, setKnobState] = React.useState<DrawerKnobState>(() => formatKnobState(knobOverrides));
+  const propertyGuruMode = isPropertyGuruPreset();
+
+  const [knobState, setKnobState] = React.useState<DrawerKnobState>(() =>
+    propertyGuruMode ? derivePropertyGuruKnobState(previewCopy) : deriveCanvasKnobState(knobOverrides)
+  );
   const [history, setHistory] = React.useState<DrawerKnobState[]>([]);
   const [toast, setToast] = React.useState<{ id: number; message: string } | null>(null);
   const lastNotifiedState = React.useRef<DrawerKnobState | null>(null);
@@ -271,10 +584,19 @@ export function CustomizeDrawer({
     });
   }, []);
 
+  const canvasSignalDescriptors = React.useMemo(() => mapCanvasSignals(promptSignals), [promptSignals]);
+  const propertyGuruSignals = React.useMemo(
+    () => previewCopy?.propertyGuruSignals ?? DEFAULT_PROPERTY_GURU_SIGNALS,
+    [previewCopy]
+  );
+
   const signals = React.useMemo(() => {
-    const mapped = mapSignals(promptSignals);
-    return mapped.length ? mapped : FALLBACK_SIGNALS;
-  }, [promptSignals]);
+    if (propertyGuruMode) {
+      const mapped = mapPropertyGuruSignalDescriptors(propertyGuruSignals);
+      return mapped.length ? mapped : FALLBACK_PROPERTY_GURU_SIGNALS;
+    }
+    return canvasSignalDescriptors.length ? canvasSignalDescriptors : FALLBACK_CANVAS_SIGNALS;
+  }, [canvasSignalDescriptors, propertyGuruMode, propertyGuruSignals]);
 
   const signalsSummary = React.useMemo(() => summarizeHighConfidenceSignals(signals), [signals]);
 
@@ -316,9 +638,16 @@ export function CustomizeDrawer({
     [normalizedRecipeId, sendPlanEditTelemetry, signalsSummary]
   );
 
-  const applyKnobState = React.useCallback(
-    (controlId: keyof DrawerKnobState, updater: (prev: DrawerKnobState) => DrawerKnobState) => {
+  const applyCanvasKnobState = React.useCallback(
+    (
+      controlId: CanvasPlanEditControlId,
+      updater: (prev: CanvasDrawerKnobState) => CanvasDrawerKnobState
+    ) => {
       setKnobState(prev => {
+        if (!isCanvasKnobState(prev)) {
+          return prev;
+        }
+
         const next = updater(prev);
 
         if (!isSameKnobState(prev, next)) {
@@ -330,7 +659,6 @@ export function CustomizeDrawer({
           if (previousValue !== nextValue) {
             emitPlanEdit(controlId, previousValue, nextValue);
           }
-
         }
 
         return next;
@@ -339,10 +667,49 @@ export function CustomizeDrawer({
     [emitPlanEdit, pushHistory]
   );
 
+  const applyPropertyGuruKnobState = React.useCallback(
+    (
+      controlId: PropertyGuruPlanEditControlId,
+      updater: (prev: PropertyGuruDrawerKnobState) => PropertyGuruDrawerKnobState
+    ) => {
+      setKnobState(prev => {
+        if (!isPropertyGuruKnobState(prev)) {
+          return prev;
+        }
+
+        const next = updater(prev);
+
+        if (!isSameKnobState(prev, next)) {
+          pushHistory(prev);
+
+          const previousValue = prev[controlId];
+          const nextValue = next[controlId];
+
+          if (previousValue !== nextValue) {
+            emitPlanEdit(controlId, previousValue, nextValue);
+          }
+        }
+
+        return next;
+      });
+    },
+    [emitPlanEdit, pushHistory]
+  );
+
+  const baselineKnobState = React.useMemo(
+    () =>
+      propertyGuruMode
+        ? derivePropertyGuruBaselineKnobState(previewCopy)
+        : DEFAULT_CANVAS_KNOB_STATE,
+    [previewCopy, propertyGuruMode]
+  );
+
   React.useEffect(() => {
     if (open) {
       setKnobState(prev => {
-        const next = formatKnobState(knobOverrides);
+        const next = propertyGuruMode
+          ? derivePropertyGuruKnobState(previewCopy)
+          : deriveCanvasKnobState(knobOverrides);
         if (isSameKnobState(prev, next)) {
           return prev;
         }
@@ -350,7 +717,7 @@ export function CustomizeDrawer({
       });
       setHistory([]);
     }
-  }, [open, knobOverrides]);
+  }, [knobOverrides, open, previewCopy, propertyGuruMode]);
 
   React.useEffect(() => {
     if (!open) {
@@ -417,16 +784,17 @@ export function CustomizeDrawer({
   }, [emitPlanEdit, knobState, showToast]);
 
   const handleReset = React.useCallback(() => {
-    if (isSameKnobState(knobState, DEFAULT_KNOB_STATE)) {
+    if (isSameKnobState(knobState, baselineKnobState)) {
       showToast("Already using baseline settings");
       return;
     }
-    const baselineState: DrawerKnobState = { ...DEFAULT_KNOB_STATE };
+
+    const nextBaseline = { ...baselineKnobState } as DrawerKnobState;
     setHistory(current => [knobState, ...current].slice(0, 5));
-    setKnobState(baselineState);
-    emitPlanEdit("reset", knobState, baselineState);
+    setKnobState(nextBaseline);
+    emitPlanEdit("reset", knobState, nextBaseline);
     showToast("Reset to baseline settings");
-  }, [emitPlanEdit, knobState, showToast]);
+  }, [baselineKnobState, emitPlanEdit, knobState, showToast]);
 
   React.useEffect(() => {
     if (!open) {
@@ -447,9 +815,13 @@ export function CustomizeDrawer({
     return null;
   }
 
-  const previewHeading = previewCopy?.stepTitle?.trim() || "Customized plan preview";
+  const canvasState = isCanvasKnobState(knobState) ? knobState : DEFAULT_CANVAS_KNOB_STATE;
+  const propertyState = isPropertyGuruKnobState(knobState) ? knobState : DEFAULT_PROPERTY_GURU_KNOB_STATE;
+
+  const previewHeading =
+    previewCopy?.stepTitle?.trim() || (propertyGuruMode ? 'Concierge plan preview' : 'Customized plan preview');
   const previewHelper = formatPreviewHelper(knobState, previewCopy?.helperText);
-  const previewCta = formatCta(knobState.inviteStrategy, previewCopy?.primaryCta);
+  const previewCta = formatCta(knobState, previewCopy?.primaryCta);
 
   return (
     <>
@@ -475,7 +847,11 @@ export function CustomizeDrawer({
               <h2 id="customize-drawer-title" className="text-base font-semibold text-foreground">
                 Customize experience
               </h2>
-              <p className="text-sm text-muted-foreground">Adjust signals and knobs to refine the canvas plan.</p>
+              <p className="text-sm text-muted-foreground">
+                {propertyGuruMode
+                  ? 'Tune concierge knobs to refine your PropertyGuru plan.'
+                  : 'Adjust signals and knobs to refine the canvas plan.'}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -486,7 +862,7 @@ export function CustomizeDrawer({
               variant="outline"
               size="sm"
               onClick={handleReset}
-              disabled={isSameKnobState(knobState, DEFAULT_KNOB_STATE)}
+              disabled={isSameKnobState(knobState, baselineKnobState)}
             >
               Reset to baseline
             </Button>
@@ -528,108 +904,225 @@ export function CustomizeDrawer({
 
           <section className="space-y-5">
             <h3 className="text-sm font-semibold text-foreground">Knob controls</h3>
+            {propertyGuruMode ? (
+              <>
+                <div className="space-y-3">
+                  <Label htmlFor="location-radius" className="text-sm font-medium text-foreground">
+                    Location radius (km)
+                  </Label>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      id="location-radius"
+                      type="range"
+                      min={1}
+                      max={10}
+                      step={1}
+                      value={propertyState.locationRadiusKm}
+                      onChange={event =>
+                        applyPropertyGuruKnobState('locationRadiusKm', prev => ({
+                          ...prev,
+                          locationRadiusKm: clampRadiusKm(Number(event.target.value)),
+                        }))
+                      }
+                      aria-valuemin={1}
+                      aria-valuemax={10}
+                      aria-valuenow={propertyState.locationRadiusKm}
+                      className="h-2 flex-1 cursor-pointer appearance-none bg-gradient-to-r from-primary/60 via-primary/70 to-primary"
+                    />
+                    <span className="w-12 text-right text-sm font-semibold text-foreground">
+                      {propertyState.locationRadiusKm}km
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    How far are you willing to commute from your anchor point?
+                  </p>
+                </div>
 
-            <div className="space-y-3">
-              <Label htmlFor="approval-chain-length" className="text-sm font-medium text-foreground">
-                Approval chain length
-              </Label>
-              <div className="flex items-center gap-3">
-                <Input
-                  id="approval-chain-length"
-                  type="range"
-                  min={0}
-                  max={5}
-                  step={1}
-                  value={knobState.approvalChainLength}
-                  onChange={event =>
-                    applyKnobState("approvalChainLength", prev => ({
-                      ...prev,
-                      approvalChainLength: Number(event.target.value),
-                    }))
-                  }
-                  aria-valuemin={0}
-                  aria-valuemax={5}
-                  aria-valuenow={knobState.approvalChainLength}
-                  className="h-2 flex-1 cursor-pointer appearance-none bg-gradient-to-r from-primary/60 via-primary/70 to-primary"
-                />
-                <span className="w-8 text-right text-sm font-semibold text-foreground">
-                  {knobState.approvalChainLength}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Set how many approvers must sign off before launch.
-              </p>
-            </div>
+                <div className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
+                  <Checkbox
+                    id="budget-stretch"
+                    checked={propertyState.budgetStretch}
+                    onCheckedChange={checked =>
+                      applyPropertyGuruKnobState('budgetStretch', prev => ({
+                        ...prev,
+                        budgetStretch: Boolean(checked),
+                      }))
+                    }
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="budget-stretch" className="text-sm font-medium text-foreground">
+                      Allow stretch budget
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Adds ~10% headroom when inventory is tight so you still see strong matches.
+                    </p>
+                  </div>
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="integration-mode" className="text-sm font-medium text-foreground">
-                Integration mode
-              </Label>
-              <Select
-                value={knobState.integrationMode}
-                onValueChange={value =>
-                  applyKnobState("integrationMode", prev => ({ ...prev, integrationMode: value }))
-                }
-              >
-                <SelectTrigger id="integration-mode">
-                  <SelectValue placeholder="Select integration mode" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="multi_tool">Multi tool workspace</SelectItem>
-                  <SelectItem value="single_tool">Single tool focus</SelectItem>
-                  <SelectItem value="custom">Custom integrations</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Choose how aggressively Canvas recommends integrations.
-              </p>
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="move-in-urgency" className="text-sm font-medium text-foreground">
+                    Move-in urgency
+                  </Label>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      id="move-in-urgency"
+                      type="range"
+                      min={0}
+                      max={5}
+                      step={1}
+                      value={propertyState.moveInUrgency}
+                      onChange={event =>
+                        applyPropertyGuruKnobState('moveInUrgency', prev => ({
+                          ...prev,
+                          moveInUrgency: Math.min(5, Math.max(0, Number(event.target.value))),
+                        }))
+                      }
+                      aria-valuemin={0}
+                      aria-valuemax={5}
+                      aria-valuenow={propertyState.moveInUrgency}
+                      className="h-2 flex-1 cursor-pointer appearance-none bg-gradient-to-r from-primary/60 via-primary/70 to-primary"
+                    />
+                    <span className="w-32 text-right text-xs font-semibold text-muted-foreground">
+                      {describeUrgencyLevel(propertyState.moveInUrgency)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    0 = browsing • 5 = ready to transact. We adjust concierge nudges accordingly.
+                  </p>
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="copy-tone" className="text-sm font-medium text-foreground">
-                Copy tone
-              </Label>
-              <Select
-                value={knobState.copyTone}
-                onValueChange={value =>
-                  applyKnobState("copyTone", prev => ({ ...prev, copyTone: value }))
-                }
-              >
-                <SelectTrigger id="copy-tone">
-                  <SelectValue placeholder="Select tone" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="collaborative">Collaborative</SelectItem>
-                  <SelectItem value="governed">Governed</SelectItem>
-                  <SelectItem value="fast-paced">Fast paced</SelectItem>
-                  <SelectItem value="trusted-advisor">Trusted advisor</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Adjust the language style used in generated copy.
-              </p>
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tone-preference" className="text-sm font-medium text-foreground">
+                    Concierge tone
+                  </Label>
+                  <Select
+                    value={propertyState.tonePreference}
+                    onValueChange={value =>
+                      applyPropertyGuruKnobState('tonePreference', prev => ({
+                        ...prev,
+                        tonePreference: value as PropertyGuruTonePreset,
+                      }))
+                    }
+                  >
+                    <SelectTrigger id="tone-preference">
+                      <SelectValue placeholder="Select tone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="reassuring">Reassuring • warm guidance</SelectItem>
+                      <SelectItem value="data_driven">Data-driven • facts first</SelectItem>
+                      <SelectItem value="concierge">Concierge • high-touch</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Choose the voice for micro-copy and follow-ups.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  <Label htmlFor="approval-chain-length" className="text-sm font-medium text-foreground">
+                    Approval chain length
+                  </Label>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      id="approval-chain-length"
+                      type="range"
+                      min={0}
+                      max={5}
+                      step={1}
+                      value={canvasState.approvalChainLength}
+                      onChange={event =>
+                        applyCanvasKnobState('approvalChainLength', prev => ({
+                          ...prev,
+                          approvalChainLength: Number(event.target.value),
+                        }))
+                      }
+                      aria-valuemin={0}
+                      aria-valuemax={5}
+                      aria-valuenow={canvasState.approvalChainLength}
+                      className="h-2 flex-1 cursor-pointer appearance-none bg-gradient-to-r from-primary/60 via-primary/70 to-primary"
+                    />
+                    <span className="w-8 text-right text-sm font-semibold text-foreground">
+                      {canvasState.approvalChainLength}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Set how many approvers must sign off before launch.
+                  </p>
+                </div>
 
-            <div className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
-              <Checkbox
-                id="invite-strategy"
-                checked={knobState.inviteStrategy === "staggered"}
-                onCheckedChange={checked =>
-                  applyKnobState("inviteStrategy", prev => ({
-                    ...prev,
-                    inviteStrategy: checked ? "staggered" : "immediate",
-                  }))
-                }
-              />
-              <div className="space-y-1">
-                <Label htmlFor="invite-strategy" className="text-sm font-medium text-foreground">
-                  Stagger invite strategy
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  When enabled, invites are batched until foundational tasks are done. Otherwise they send immediately.
-                </p>
-              </div>
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="integration-mode" className="text-sm font-medium text-foreground">
+                    Integration mode
+                  </Label>
+                  <Select
+                    value={canvasState.integrationMode}
+                    onValueChange={value =>
+                      applyCanvasKnobState('integrationMode', prev => ({ ...prev, integrationMode: value }))
+                    }
+                  >
+                    <SelectTrigger id="integration-mode">
+                      <SelectValue placeholder="Select integration mode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="multi_tool">Multi tool workspace</SelectItem>
+                      <SelectItem value="single_tool">Single tool focus</SelectItem>
+                      <SelectItem value="custom">Custom integrations</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Choose how aggressively Canvas recommends integrations.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="copy-tone" className="text-sm font-medium text-foreground">
+                    Copy tone
+                  </Label>
+                  <Select
+                    value={canvasState.copyTone}
+                    onValueChange={value =>
+                      applyCanvasKnobState('copyTone', prev => ({ ...prev, copyTone: value }))
+                    }
+                  >
+                    <SelectTrigger id="copy-tone">
+                      <SelectValue placeholder="Select tone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="collaborative">Collaborative</SelectItem>
+                      <SelectItem value="governed">Governed</SelectItem>
+                      <SelectItem value="fast-paced">Fast paced</SelectItem>
+                      <SelectItem value="trusted-advisor">Trusted advisor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Adjust the language style used in generated copy.
+                  </p>
+                </div>
+
+                <div className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
+                  <Checkbox
+                    id="invite-strategy"
+                    checked={canvasState.inviteStrategy === 'staggered'}
+                    onCheckedChange={checked =>
+                      applyCanvasKnobState('inviteStrategy', prev => ({
+                        ...prev,
+                        inviteStrategy: checked ? 'staggered' : 'immediate',
+                      }))
+                    }
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="invite-strategy" className="text-sm font-medium text-foreground">
+                      Stagger invite strategy
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      When enabled, invites are batched until foundational tasks are done. Otherwise they send immediately.
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
           </section>
 
           <section className="space-y-3">

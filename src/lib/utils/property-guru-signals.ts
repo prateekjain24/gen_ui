@@ -20,7 +20,7 @@ interface Detection<T> {
   notes?: string;
 }
 
-const DEFAULT_SIGNALS: PropertyGuruSignals = {
+export const DEFAULT_PROPERTY_GURU_SIGNALS: PropertyGuruSignals = {
   location: {
     primaryArea: 'Singapore',
     radiusKm: 5,
@@ -119,21 +119,21 @@ export function extractPropertyGuruSignals(
   const trimmed = prompt.trim();
   if (!trimmed) {
     debug('Received empty prompt payload');
-    const fallbackSummaries = createDefaultSummaries(DEFAULT_SIGNALS);
+    const fallbackSummaries = createDefaultSummaries(DEFAULT_PROPERTY_GURU_SIGNALS);
     emitTelemetry(fallbackSummaries, options);
-    return { signals: { ...DEFAULT_SIGNALS }, summaries: fallbackSummaries };
+    return { signals: { ...DEFAULT_PROPERTY_GURU_SIGNALS }, summaries: fallbackSummaries };
   }
 
   const lower = trimmed.toLowerCase();
   const signals: PropertyGuruSignals = {
-    location: { ...DEFAULT_SIGNALS.location },
-    price: { ...DEFAULT_SIGNALS.price },
-    propertyType: DEFAULT_SIGNALS.propertyType,
-    bedrooms: DEFAULT_SIGNALS.bedrooms,
-    moveInHorizon: DEFAULT_SIGNALS.moveInHorizon,
-    lifestyle: [...DEFAULT_SIGNALS.lifestyle],
-    financeReadiness: DEFAULT_SIGNALS.financeReadiness,
-    tonePreference: DEFAULT_SIGNALS.tonePreference,
+    location: { ...DEFAULT_PROPERTY_GURU_SIGNALS.location },
+    price: { ...DEFAULT_PROPERTY_GURU_SIGNALS.price },
+    propertyType: DEFAULT_PROPERTY_GURU_SIGNALS.propertyType,
+    bedrooms: DEFAULT_PROPERTY_GURU_SIGNALS.bedrooms,
+    moveInHorizon: DEFAULT_PROPERTY_GURU_SIGNALS.moveInHorizon,
+    lifestyle: [...DEFAULT_PROPERTY_GURU_SIGNALS.lifestyle],
+    financeReadiness: DEFAULT_PROPERTY_GURU_SIGNALS.financeReadiness,
+    tonePreference: DEFAULT_PROPERTY_GURU_SIGNALS.tonePreference,
   };
   const summaries: PromptSignalSummary[] = [];
 

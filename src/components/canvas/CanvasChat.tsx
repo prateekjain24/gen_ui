@@ -9,6 +9,9 @@ import {
   formatCta as formatCustomizeCta,
   formatPreviewHelper as formatCustomizeHelper,
   inviteCaption as formatCustomizeInviteCaption,
+  isCanvasKnobState,
+  isPropertyGuruKnobState,
+  urgencyToMoveInHorizon,
 } from "@/app/canvas/components/customize-drawer";
 import { PersonaBadge, PromptSignalsDebugPanel, ReasoningChip } from "@/components/canvas";
 import { FormRenderer } from "@/components/form/FormRenderer";
@@ -31,6 +34,12 @@ import type {
   ToolIdentifier,
 } from "@/lib/prompt-intel/types";
 import type { PropertyGuruPlanTemplate } from "@/lib/property-guru/prompt";
+import type { PropertyGuruSignals } from "@/lib/types/property-guru";
+import {
+  mapPropertyGuruPlanToSearchPayload,
+  type PropertyGuruSearchPayload,
+} from "@/lib/utils/property-guru-plan-mapper";
+import { DEFAULT_PROPERTY_GURU_SIGNALS } from "@/lib/utils/property-guru-signals";
 import { createTelemetryQueue, type TelemetryQueue } from "@/lib/telemetry/events";
 import type { AIAttribution, AIAttributionSignal } from "@/lib/types/ai";
 import type { Field, FieldOption, FormPlan, IntegrationPickerField, StepperItem } from "@/lib/types/form";
@@ -61,6 +70,10 @@ interface TemplateCopyPayload {
   badgeCaption: string;
   issues: SlotValidationIssue[];
   propertyGuruPlan?: PropertyGuruPlanTemplate;
+  propertyGuruSignals?: PropertyGuruSignals;
+  propertyGuruSignalsBaseline?: PropertyGuruSignals;
+  propertyGuruSearchPayload?: PropertyGuruSearchPayload;
+  propertyGuruDefaults?: string[];
 }
 
 interface CanvasPlanState extends CanvasPlanResponse {
@@ -204,8 +217,8 @@ const INTEGRATION_MODE_HELPERS: Record<string, string> = {
   governed: "Limit integrations to vetted systems with guardrails.",
 };
 
-const mapInviteStrategyToOverrideValue = (strategy: DrawerKnobState["inviteStrategy"]): string =>
-  strategy === "staggered" ? "staged" : strategy;
+const mapInviteStrategyToOverrideValue = (strategy: 'immediate' | 'staggered'): string =>
+  strategy === 'staggered' ? 'staged' : strategy;
 
 const normalizeApprovalLength = (
   value: number,
@@ -230,7 +243,11 @@ const deriveIntegrationHelper = (mode: string | undefined, fallback?: string): s
   return INTEGRATION_MODE_HELPERS[mode] ?? fallback;
 };
 
-const applyKnobOverridesToPlan = (plan: CanvasPlanState, state: DrawerKnobState): CanvasPlanState => {
+const applyCanvasKnobOverridesToPlan = (plan: CanvasPlanState, state: DrawerKnobState): CanvasPlanState => {
+  if (!isCanvasKnobState(state)) {
+    return plan;
+  }
+
   const recipe = getRecipe(plan.recipeId);
   const knobDefinitions = recipe.knobs ?? {};
 
@@ -266,7 +283,7 @@ const applyKnobOverridesToPlan = (plan: CanvasPlanState, state: DrawerKnobState)
   };
 
   const helperText = formatCustomizeHelper(state, undefined);
-  const primaryCta = formatCustomizeCta(state.inviteStrategy, undefined);
+  const primaryCta = formatCustomizeCta(state, undefined);
 
   const updatedTemplateCopy: TemplateCopyPayload = {
     ...plan.templateCopy,
@@ -341,6 +358,190 @@ const applyKnobOverridesToPlan = (plan: CanvasPlanState, state: DrawerKnobState)
     formPlan,
     fields: updatedFields,
   };
+};
+
+const formatCurrencyRange = (min?: number, max?: number, stretch?: boolean): string => {
+  if (!min && !max) {
+    return 'Budget to refine';
+  }
+
+  const formatter = new Intl.NumberFormat('en-SG', {
+    style: 'currency',
+    currency: 'SGD',
+    maximumFractionDigits: 0,
+  });
+
+  const minLabel = min ? formatter.format(min) : '';
+  let maxLabel = max ? formatter.format(max) : '';
+  if (max && stretch) {
+    maxLabel = formatter.format(Math.round(max * 1.1));
+  }
+
+  if (minLabel && maxLabel) {
+    return stretch ? `${minLabel} – ${maxLabel} (stretch +10%)` : `${minLabel} – ${maxLabel}`;
+  }
+  return minLabel || maxLabel;
+};
+
+const describeTonePreference = (tone: PropertyGuruSignals['tonePreference']): string => {
+  switch (tone) {
+    case 'data_driven':
+      return 'data-driven';
+    case 'concierge':
+      return 'concierge';
+    default:
+      return 'reassuring';
+  }
+};
+
+const describeUrgencyBadge = (value: number): string => {
+  const clamped = Math.min(5, Math.max(0, Math.round(value)));
+  switch (clamped) {
+    case 5:
+      return 'Immediate move';
+    case 4:
+      return 'Ready soon';
+    case 3:
+      return 'Planning next';
+    case 2:
+      return 'Exploring timelines';
+    case 1:
+      return 'Browsing ideas';
+    default:
+      return 'Just browsing';
+  }
+};
+
+const updatePropertyGuruPlanContent = (
+  planTemplate: PropertyGuruPlanTemplate,
+  signals: PropertyGuruSignals,
+  state: DrawerKnobState
+): PropertyGuruPlanTemplate => {
+  if (!isPropertyGuruKnobState(state)) {
+    return planTemplate;
+  }
+
+  const locationLine = `${signals.location.radiusKm ?? 5}km around ${signals.location.primaryArea}`;
+  const priceLine = formatCurrencyRange(signals.price.min, signals.price.max, signals.price.stretchOk);
+
+  const essentials = {
+    ...planTemplate.essentials,
+    items: planTemplate.essentials.items.map(item => {
+      if (/location/i.test(item.label)) {
+        return {
+          ...item,
+          value: locationLine,
+          helper: 'Tighten or widen the radius to reshape your shortlist.',
+        };
+      }
+      if (/price/i.test(item.label)) {
+        return {
+          ...item,
+          value: priceLine,
+          helper: signals.price.stretchOk
+            ? 'Includes a 10% buffer so turnkey listings still surface.'
+            : 'Keeps suggestions firmly inside your comfort band.',
+        };
+      }
+      return item;
+    }),
+  };
+
+  const tone = describeTonePreference(state.tonePreference);
+  const urgencyLabel = describeUrgencyBadge(state.moveInUrgency).toLowerCase();
+
+  const microCopy = {
+    reassurance:
+      state.tonePreference === 'data_driven'
+        ? 'We will surface price comps and transaction trends so you stay confident.'
+        : state.tonePreference === 'concierge'
+          ? 'Your concierge will ping you personally when curated matches appear.'
+          : 'We keep an eye on family-friendly listings and flag fresh options quickly.',
+    follow_up:
+      state.moveInUrgency >= 4
+        ? 'Expect rapid alerts so you can act the same day.'
+        : state.moveInUrgency >= 2
+          ? 'We will send twice-weekly summaries with new matches and planning tips.'
+          : 'A light weekly digest keeps inspiration flowing until you are ready.',
+  };
+
+  return {
+    ...planTemplate,
+    essentials,
+    lifestyle_filters: {
+      ...planTemplate.lifestyle_filters,
+      helper: `Toggle the cues that matter most; tone is ${tone}, timeline is ${urgencyLabel}.`,
+    },
+    micro_copy: {
+      reassurance: microCopy.reassurance,
+      follow_up: microCopy.follow_up,
+    },
+  };
+};
+
+const applyPropertyGuruKnobsToPlan = (plan: CanvasPlanState, state: DrawerKnobState): CanvasPlanState => {
+  if (!isPropertyGuruKnobState(state)) {
+    return plan;
+  }
+
+  const template = plan.templateCopy;
+  const planTemplate = template.propertyGuruPlan;
+  if (!planTemplate) {
+    return plan;
+  }
+
+  const baselineSignals = template.propertyGuruSignalsBaseline ?? DEFAULT_PROPERTY_GURU_SIGNALS;
+  const currentSignals = template.propertyGuruSignals ?? baselineSignals;
+
+  const baselinePrice = baselineSignals.price;
+
+  const updatedSignals: PropertyGuruSignals = {
+    ...currentSignals,
+    location: {
+      ...currentSignals.location,
+      radiusKm: state.locationRadiusKm,
+    },
+    price: {
+      ...currentSignals.price,
+      stretchOk: state.budgetStretch,
+      max: baselinePrice.max ?? baselinePrice.min ?? currentSignals.price.max,
+      min: baselinePrice.min ?? currentSignals.price.min,
+    },
+    moveInHorizon: urgencyToMoveInHorizon(state.moveInUrgency),
+    tonePreference: state.tonePreference,
+  };
+
+  const updatedPlanTemplate = updatePropertyGuruPlanContent(planTemplate, updatedSignals, state);
+  const { payload, defaultsApplied } = mapPropertyGuruPlanToSearchPayload({
+    plan: updatedPlanTemplate,
+    signals: updatedSignals,
+  });
+
+  const helperText = formatCustomizeHelper(state, undefined);
+  const primaryCta = formatCustomizeCta(state, plan.templateCopy.primaryCta);
+
+  const updatedTemplateCopy: TemplateCopyPayload = {
+    ...template,
+    helperText,
+    primaryCta,
+    propertyGuruPlan: updatedPlanTemplate,
+    propertyGuruSignals: updatedSignals,
+    propertyGuruSignalsBaseline: template.propertyGuruSignalsBaseline ?? baselineSignals,
+    propertyGuruSearchPayload: payload,
+    propertyGuruDefaults: defaultsApplied,
+  };
+
+  return {
+    ...plan,
+    templateCopy: updatedTemplateCopy,
+  };
+};
+
+const applyKnobOverridesToPlan = (plan: CanvasPlanState, state: DrawerKnobState): CanvasPlanState => {
+  if (isPropertyGuruKnobState(state)) {
+    return applyPropertyGuruKnobsToPlan(plan, state);
+  }
+  return applyCanvasKnobOverridesToPlan(plan, state);
 };
 
 
