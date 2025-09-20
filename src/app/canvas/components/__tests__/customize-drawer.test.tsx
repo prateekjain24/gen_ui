@@ -45,12 +45,36 @@ const previewCopy = {
 
 describe("CustomizeDrawer history controls", () => {
   const onOpenChange = jest.fn();
+  const fetchMock = jest.fn();
+  let originalFetch: typeof fetch | undefined;
+
+  beforeAll(() => {
+    originalFetch = global.fetch;
+  });
+
+  beforeEach(() => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      text: async () => "",
+      statusText: "ok",
+    } as Response);
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    fetchMock.mockReset();
+  });
+
+  afterAll(() => {
+    global.fetch = originalFetch ?? ((undefined as unknown) as typeof fetch);
+  });
 
   const setup = () =>
     render(
       <CustomizeDrawer
         open
         onOpenChange={onOpenChange}
+        recipeId="R1"
         promptSignals={baseSignals}
         knobOverrides={baseKnobs}
         previewCopy={previewCopy}

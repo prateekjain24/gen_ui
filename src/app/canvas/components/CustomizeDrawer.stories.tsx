@@ -187,6 +187,7 @@ export const DefaultPlan = () => (
     <CustomizeDrawer
       open
       onOpenChange={noop}
+      recipeId="R1"
       promptSignals={defaultSignals}
       previewCopy={{
         stepTitle: "Baseline team workspace",
@@ -202,6 +203,7 @@ export const PersonalizedPlan = () => (
     <CustomizeDrawer
       open
       onOpenChange={noop}
+      recipeId="R2"
       promptSignals={personalizedSignals}
       knobOverrides={personalizedOverrides}
       previewCopy={{
@@ -218,6 +220,7 @@ export const FallbackSignals = () => (
     <CustomizeDrawer
       open
       onOpenChange={noop}
+      recipeId="R3"
       previewCopy={{
         stepTitle: "Awaiting signal enrichment",
         helperText: "Defaults hold steady while we gather more context from the prompt.",
@@ -232,6 +235,7 @@ export const ResetFlow = () => (
     <CustomizeDrawer
       open
       onOpenChange={noop}
+      recipeId="R4"
       promptSignals={defaultSignals}
       knobOverrides={resetReadyOverrides}
       previewCopy={{

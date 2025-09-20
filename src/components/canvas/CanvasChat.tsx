@@ -740,6 +740,7 @@ export function CanvasChat(): React.ReactElement {
       <CustomizeDrawer
         open={isCustomizeOpen}
         onOpenChange={setCustomizeOpen}
+        recipeId={plan?.recipeId}
         promptSignals={plan?.promptSignals}
         knobOverrides={plan?.personalization.overrides}
         previewCopy={plan?.templateCopy}

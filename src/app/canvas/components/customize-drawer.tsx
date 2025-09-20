@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 interface CustomizeDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  recipeId?: string;
   promptSignals?: PromptSignals;
   knobOverrides?: RecipeKnobOverrides;
   previewCopy?: {
@@ -45,6 +46,16 @@ interface SignalDescriptor {
   value: string;
   confidence: number;
   source: PromptSignalSource;
+}
+
+type PlanEditControlId = keyof DrawerKnobState | "undo" | "reset";
+
+interface PlanEditLogPayload {
+  recipeId: string;
+  controlId: PlanEditControlId;
+  previousValue: unknown;
+  nextValue: unknown;
+  signalsSummary: string;
 }
 
 const isSameKnobState = (a: DrawerKnobState, b: DrawerKnobState): boolean =>
@@ -95,6 +106,8 @@ const SOURCE_LABEL: Record<PromptSignalSource, string> = {
   llm: "LLM",
   merge: "Merged",
 };
+
+const HIGH_CONFIDENCE_THRESHOLD = 0.6;
 
 const formatKnobState = (overrides?: RecipeKnobOverrides): DrawerKnobState => {
   if (!overrides) {
@@ -149,6 +162,24 @@ const mapSignals = (signals?: PromptSignals): SignalDescriptor[] => {
   }, []);
 };
 
+const summarizeHighConfidenceSignals = (signalDescriptors: SignalDescriptor[]): string => {
+  const highConfidence = signalDescriptors.filter(signal => signal.confidence >= HIGH_CONFIDENCE_THRESHOLD);
+
+  if (!highConfidence.length) {
+    return "[]";
+  }
+
+  return JSON.stringify(
+    highConfidence.map(signal => ({
+      id: signal.id,
+      label: signal.label,
+      value: signal.value,
+      confidence: Number(signal.confidence.toFixed(2)),
+      source: signal.source,
+    }))
+  );
+};
+
 const confidenceClass = (confidence: number): string => {
   if (confidence >= 0.6) {
     return "bg-emerald-100 text-emerald-700";
@@ -201,6 +232,7 @@ const inviteCaption = (state: DrawerKnobState): string =>
 export function CustomizeDrawer({
   open,
   onOpenChange,
+  recipeId,
   promptSignals,
   knobOverrides,
   previewCopy,
@@ -209,6 +241,8 @@ export function CustomizeDrawer({
   const [knobState, setKnobState] = React.useState<DrawerKnobState>(() => formatKnobState(knobOverrides));
   const [history, setHistory] = React.useState<DrawerKnobState[]>([]);
   const [toast, setToast] = React.useState<{ id: number; message: string } | null>(null);
+
+  const normalizedRecipeId = React.useMemo(() => recipeId?.trim() ?? "", [recipeId]);
 
   const showToast = React.useCallback((message: string) => {
     setToast({ id: Date.now(), message });
@@ -234,22 +268,72 @@ export function CustomizeDrawer({
     });
   }, []);
 
-  const applyKnobState = React.useCallback(
-    (updater: (prev: DrawerKnobState) => DrawerKnobState) => {
-      setKnobState(prev => {
-        const next = updater(prev);
-        if (!isSameKnobState(prev, next)) {
-          pushHistory(prev);
-        }
-        return next;
-      });
-    },
-    [pushHistory]
-  );
   const signals = React.useMemo(() => {
     const mapped = mapSignals(promptSignals);
     return mapped.length ? mapped : FALLBACK_SIGNALS;
   }, [promptSignals]);
+
+  const signalsSummary = React.useMemo(() => summarizeHighConfidenceSignals(signals), [signals]);
+
+  const sendPlanEditTelemetry = React.useCallback(async (payload: PlanEditLogPayload) => {
+    try {
+      const response = await fetch("/api/telemetry/plan-edits", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        console.warn("Plan edit telemetry rejected", message || response.statusText);
+      }
+    } catch (error) {
+      console.warn("Plan edit telemetry request failed", error);
+    }
+  }, []);
+
+  const emitPlanEdit = React.useCallback(
+    (controlId: PlanEditControlId, previousValue: unknown, nextValue: unknown) => {
+      if (!normalizedRecipeId) {
+        return;
+      }
+
+      const payload: PlanEditLogPayload = {
+        recipeId: normalizedRecipeId,
+        controlId,
+        previousValue,
+        nextValue,
+        signalsSummary,
+      };
+
+      void sendPlanEditTelemetry(payload);
+    },
+    [normalizedRecipeId, sendPlanEditTelemetry, signalsSummary]
+  );
+
+  const applyKnobState = React.useCallback(
+    (controlId: keyof DrawerKnobState, updater: (prev: DrawerKnobState) => DrawerKnobState) => {
+      setKnobState(prev => {
+        const next = updater(prev);
+
+        if (!isSameKnobState(prev, next)) {
+          pushHistory(prev);
+
+          const previousValue = prev[controlId];
+          const nextValue = next[controlId];
+
+          if (previousValue !== nextValue) {
+            emitPlanEdit(controlId, previousValue, nextValue);
+          }
+        }
+
+        return next;
+      });
+    },
+    [emitPlanEdit, pushHistory]
+  );
 
   React.useEffect(() => {
     if (open) {
@@ -316,20 +400,23 @@ export function CustomizeDrawer({
       }
       const [previous, ...rest] = current;
       setKnobState(previous);
+      emitPlanEdit("undo", knobState, previous);
       showToast("Reverted last change");
       return rest;
     });
-  }, [showToast]);
+  }, [emitPlanEdit, knobState, showToast]);
 
   const handleReset = React.useCallback(() => {
     if (isSameKnobState(knobState, DEFAULT_KNOB_STATE)) {
       showToast("Already using baseline settings");
       return;
     }
+    const baselineState: DrawerKnobState = { ...DEFAULT_KNOB_STATE };
     setHistory(current => [knobState, ...current].slice(0, 5));
-    setKnobState(DEFAULT_KNOB_STATE);
+    setKnobState(baselineState);
+    emitPlanEdit("reset", knobState, baselineState);
     showToast("Reset to baseline settings");
-  }, [knobState, showToast]);
+  }, [emitPlanEdit, knobState, showToast]);
 
   if (!open) {
     return null;
@@ -430,7 +517,10 @@ export function CustomizeDrawer({
                   step={1}
                   value={knobState.approvalChainLength}
                   onChange={event =>
-                    applyKnobState(prev => ({ ...prev, approvalChainLength: Number(event.target.value) }))
+                    applyKnobState("approvalChainLength", prev => ({
+                      ...prev,
+                      approvalChainLength: Number(event.target.value),
+                    }))
                   }
                   aria-valuemin={0}
                   aria-valuemax={5}
@@ -452,7 +542,9 @@ export function CustomizeDrawer({
               </Label>
               <Select
                 value={knobState.integrationMode}
-                onValueChange={value => applyKnobState(prev => ({ ...prev, integrationMode: value }))}
+                onValueChange={value =>
+                  applyKnobState("integrationMode", prev => ({ ...prev, integrationMode: value }))
+                }
               >
                 <SelectTrigger id="integration-mode">
                   <SelectValue placeholder="Select integration mode" />
@@ -472,7 +564,12 @@ export function CustomizeDrawer({
               <Label htmlFor="copy-tone" className="text-sm font-medium text-foreground">
                 Copy tone
               </Label>
-              <Select value={knobState.copyTone} onValueChange={value => applyKnobState(prev => ({ ...prev, copyTone: value }))}>
+              <Select
+                value={knobState.copyTone}
+                onValueChange={value =>
+                  applyKnobState("copyTone", prev => ({ ...prev, copyTone: value }))
+                }
+              >
                 <SelectTrigger id="copy-tone">
                   <SelectValue placeholder="Select tone" />
                 </SelectTrigger>
@@ -493,7 +590,10 @@ export function CustomizeDrawer({
                 id="invite-strategy"
                 checked={knobState.inviteStrategy === "staggered"}
                 onCheckedChange={checked =>
-                  applyKnobState(prev => ({ ...prev, inviteStrategy: checked ? "staggered" : "immediate" }))
+                  applyKnobState("inviteStrategy", prev => ({
+                    ...prev,
+                    inviteStrategy: checked ? "staggered" : "immediate",
+                  }))
                 }
               />
               <div className="space-y-1">
