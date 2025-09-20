@@ -34,7 +34,6 @@ type ParsedSignal<T> = {
 const debug = createDebugger('PromptIntel:LLMParser');
 
 const PROMPT_TIMEOUT_MS = 30_000;
-const PROMPT_TEMPERATURE = 0.2;
 const MAX_OUTPUT_TOKENS = 1_200;
 const DEFAULT_CONFIDENCE = 0.6;
 
@@ -192,7 +191,6 @@ export async function fetchSignalsFromLLM(
           model: openai(LLM_CONFIG.model),
           system: SYSTEM_PROMPT,
           prompt: buildUserPrompt(prompt),
-          temperature: PROMPT_TEMPERATURE,
           maxOutputTokens: MAX_OUTPUT_TOKENS,
           abortSignal: combined.signal,
           maxRetries: 0,

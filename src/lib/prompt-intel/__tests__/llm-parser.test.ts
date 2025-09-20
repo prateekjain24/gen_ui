@@ -64,7 +64,6 @@ describe('fetchSignalsFromLLM', () => {
     expect(generateText).toHaveBeenCalledWith(
       expect.objectContaining({
         model: 'mock-model',
-        temperature: 0.2,
         maxOutputTokens: 1200,
       })
     );

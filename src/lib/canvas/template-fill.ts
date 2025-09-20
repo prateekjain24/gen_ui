@@ -166,10 +166,6 @@ export const renderTemplateCopy = async (context: TemplateFillContext): Promise<
               system: TEMPLATE_SYSTEM_PROMPT,
               prompt,
               maxOutputTokens: Math.min(1200, LLM_CONFIG.maxTokens),
-              temperature: 0.2,
-              topP: 0.9,
-              presencePenalty: 0,
-              frequencyPenalty: 0,
               abortSignal: signal,
               maxRetries: 0,
             });
@@ -336,12 +332,55 @@ const parseTemplateResponse = (raw: string | null): Record<TemplateId, Record<st
     return null;
   }
 
+  const cleaned = trimmed.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+
+  const attempt = (candidate: string) => {
+    try {
+      const parsed = JSON.parse(candidate) as Record<string, Record<string, string>>;
+      return parsed as Record<TemplateId, Record<string, string>>;
+    } catch {
+      return null;
+    }
+  };
+
+  const directParse = attempt(cleaned);
+  if (directParse) {
+    return directParse;
+  }
+
+  const repaired = repairJson(cleaned);
+  if (repaired) {
+    return repaired;
+  }
+
+  debugError("Failed to parse template response", new Error("invalid_template_json"), { raw });
+  return null;
+};
+
+const repairJson = (input: string): Record<TemplateId, Record<string, string>> | null => {
+  let candidate = input;
+
+  const count = (value: string, pattern: RegExp) => (value.match(pattern) ?? []).length;
+
+  const braceDelta = count(candidate, /\{/g) - count(candidate, /}/g);
+  if (braceDelta > 0) {
+    candidate += "}".repeat(braceDelta);
+  }
+
+  const bracketDelta = count(candidate, /\[/g) - count(candidate, /\]/g);
+  if (bracketDelta > 0) {
+    candidate += "]".repeat(bracketDelta);
+  }
+
+  const quoteCount = count(candidate, /"/g);
+  if (quoteCount % 2 !== 0) {
+    candidate += '"';
+  }
+
   try {
-    const cleaned = trimmed.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-    const parsed = JSON.parse(cleaned) as Record<string, Record<string, string>>;
+    const parsed = JSON.parse(candidate) as Record<string, Record<string, string>>;
     return parsed as Record<TemplateId, Record<string, string>>;
-  } catch (error) {
-    debugError("Failed to parse template response", error, { raw });
+  } catch {
     return null;
   }
 };

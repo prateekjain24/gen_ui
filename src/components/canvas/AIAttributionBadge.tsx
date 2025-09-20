@@ -128,8 +128,8 @@ export function AIAttributionBadge({ attribution, className, size = "md" }: AIAt
               <div className="space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Details</p>
                 <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">
-                  {attribution.fallbackDetails.map(detail => (
-                    <li key={detail}>{detail}</li>
+                  {attribution.fallbackDetails.map((detail, index) => (
+                    <li key={`fallback-detail-${index}`}>{detail}</li>
                   ))}
                 </ul>
               </div>
