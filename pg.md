@@ -1,61 +1,62 @@
-# PropertyGuru Seeker Onboarding – Minimal Canvas Flip
+# PropertyGuru Seeker Onboarding – Intelligence Requirements
 
 ## Product framing
-**Audience:** Home seekers arriving at PropertyGuru (web) who want help narrowing down listings quickly.
-**Problem:** Today seekers face an overwhelming catalog; filters help, but they don’t feel guided. We want a lightweight conversational onboarding that captures intent in <2 minutes, then pre-fills PropertyGuru search/workspace states.
-**Approach:** Reuse Canvas’ prompt-to-plan engine, but retune signals + output to drive PropertyGuru’s listing discovery instead of B2B workspace setup.
+**Audience:** Home seekers arriving at PropertyGuru web who need fast, confident guidance toward relevant listings.
+**Problem:** Filter-driven discovery forces users to translate fuzzy life moments (“twins on the way, want parents nearby”) into rigid forms, causing drop-off.
+**Approach:** Reuse Canvas’ conversation-to-plan engine, retune it with PropertyGuru signals and response formats, and let an LLM act as the orchestrator that understands nuance, narrates trade-offs, and drives the right CTAs.
 
-## What changes vs. Canvas MVP
-| Canvas Today | PropertyGuru Flip |
-| --- | --- |
-| Prompt describes workspace needs | Prompt captures housing intent (“Need 2BR condo near MRT under SGD 1.2M”) |
-| Signals: team size, tools, approvals | Signals: location, budget, property type, move-in timeline, financing readiness |
-| Output: onboarding flow components | Output: seeker journey steps (saved search, mortgage precheck, neighborhood brief) + CTA into listings |
-| Customize drawer toggles knobs | Drawer adjusts housing preferences (commute priority slider, renovation tolerance, layout needs) |
+## Why LLM-first, not rules
+- Rule systems can detect obvious entities (price, bedrooms) but collapse when signals conflict, evolve mid-session, or require empathetic copy.
+- We need one brain that interprets the entire story, chooses which trade-offs to surface, and keeps plan + copy in sync each regeneration.
+- LLM output plus telemetry lets us learn what resonates and iterate by adjusting prompts/examples—no brittle decision trees to babysit.
 
-Minimal code changes: swap signal extractors, copy schema, and recipe fields; keep LLM scaffolding + telemetry as-is.
+## Experience pillars (must-haves)
+- **Context capture:** Gather location, price, property type, bedrooms, move-in horizon, lifestyle cues, financing readiness within two turns.
+- **Narrative plan:** Summarize intent, present 2–3 guided steps, and embed relevant actions (saved search, mortgage, neighborhood brief) with PropertyGuru voice options (reassuring, data-driven, concierge).
+- **Adaptive controls:** Customize drawer exposes location radius, budget stretch, move-in urgency, tone presets; Undo/Reset keep experimentation safe.
+- **Structured output:** Every plan produces a JSON payload with filters, highlights, next steps, and copy for downstream search + marketing surfaces.
+- **Observable intelligence:** Log extracted signals, confidence, applied defaults, and manual overrides so ops can tune prompts and guardrails quickly.
 
-## Signal & knob mapping
-- **Location focus** (primary city / neighborhood) → pre-fill map view.
-- **Budget band** → sets price filters, triggers mortgage wizard if high.
-- **Property type & bedrooms** → listing filters + saved search config.
-- **Move-in horizon** (urgent / flexible) → suggestions (ready-to-move vs. new launches).
-- **Lifestyle cues** (schools, MRT, pet-friendly) → highlight relevant PropertyGuru content sections.
-- **Finance preparedness** (loan pre-approved?) → push to PropertyGuru Finance.
+## LLM responsibilities
+- Parse messy seeker briefs into the `PropertyGuruSignals` schema and call out ambiguities for follow-up.
+- Generate empathetic micro-copy that explains why certain listings or actions are suggested.
+- Reconcile conflicting cues (e.g., urgent move-in but desire for new launches) by proposing trade-offs instead of returning empty results.
+- Adapt the plan live when drawer knobs or new user turns arrive, keeping steps coherent and copy consistent.
 
-## Flow (LLM-generated)
-1. **Intent summary** – “Let’s find a 2-bedroom condo near Tampines MRT within SGD 1.2M.”
-2. **Step 1: Tune essentials** – UI fields for area radius, price band, property type.
-3. **Step 2: Lifestyle filters** – toggles for schools, amenities, commute time.
-4. **Step 3: Plan actions** – CTA to view matches + optional mortgage check.
-5. **Micro-copy** – reassure on listing freshness, send weekly summaries.
+## Engineering anchors
+- Typed signal schema + constants shared in `src/lib` so extractors, UI, and telemetry stay aligned.
+- Prompt + response templates toggled by feature flag to keep Canvas MVP stable while the PropertyGuru preset evolves.
+- Mapper utility converts planner output to PropertyGuru search payloads (district codes, highlights, next steps) with graceful fallbacks and logging.
+- Jest fixtures cover representative seeker briefs to freeze expected plan shapes and payloads.
 
-## Customize drawer (manual override)
-- **Location radius slider** (1km ↔ 10km).
-- **Budget stretch toggle** (allow >10% buffer?).
-- **Move-in urgency slider** (0 = browsing, 5 = ready to transact).
-- **Copy tone** (reassuring, data-driven, concierge).
+## Flow playbooks to design against
+1. **Urgent twins near Tampines MRT**
+   - Prompt: “Expecting twins in 4 months, want a 3BR condo near Tampines MRT, budget around 1.4M but I’ll stretch for turnkey. Need good preschool options and low-renovation.”
+   - Plan: Intent summary, essentials with tight radius + price stretch, lifestyle filters for childcare and move-in ready, actions highlighting MRT shortlist and preschool briefing, micro-copy reassuring caregivers.
+   - Drawer moment: Move-in urgency maxed, budget stretch on → regenerated plan prioritizes ready-stock listings and nudges mortgage pre-check.
+2. **Split-city remote worker**
+   - Prompt: “Splitting time between Singapore and KL, need a 1BR serviced apartment near TEL, want co-working nearby and flexible lease; budget SGD 3.2K monthly.”
+   - Plan: Essentials anchor TEL stations and rent cap, lifestyle filters surface co-working and serviced amenities, actions include dual-city shortlist + remote tour scheduling, copy shifts to concierge tone.
+3. **Investor chasing rental yield**
+   - Prompt: “Looking for a 2BR resale condo in Queenstown under 1.3M, strong rental demand, okay with minor reno, want data on yield and past transactions.”
+   - Plan: Data-forward intent summary, essentials fix District 3 and bedrooms, lifestyle filters highlight rental hotspots and reno potential, actions point to yield reports + transactions export, copy leans analytical.
+4. **Multi-generational accessibility**
+   - Prompt: “Retiring parents moving in, need 4BR near Bishan, lift access, wheelchair friendly, near hospitals and parks; budget 2.3M; we can wait 6–9 months.”
+   - Plan: Essentials capture flexible timeline, lifestyle filters emphasize accessibility, hospital proximity, nature, actions promote accessibility shortlist + renovation partner, copy reassures on long-term comfort.
+5. **First-time buyer discovery**
+   - Prompt: “First time buying, looking at ECs in Punggol around 1M, not pre-approved, two kids in primary school, want grants guidance and weekly listing digests.”
+   - Plan: Intent summary educates on EC eligibility, essentials set EC filters + price with grants, lifestyle filters tick schools and community amenities, actions include HDB grant checklist + weekly digest enrollment, copy encourages coaching tone.
 
-## Output & integration
-- Generated plan hands PropertyGuru’s search page a JSON payload:
-  ```json
-  {
-    "filters": { "district": [18], "maxPrice": 1200000, "propertyType": "condo", "bedrooms": 2 },
-    "highlights": ["near MRT", "family-friendly"],
-    "nextSteps": ["savedSearch", "mortgagePreCheck"],
-    "copy": { "hero": "Curated condos near Tampines MRT within reach." }
-  }
-  ```
-- Optionally surface a “Preview listings” component using PropertyGuru APIs.
-
-## Why it matters
-- Replaces a static filter sidebar with a guided conversation → higher first-session engagement.
-- Gives marketing & CX a storytelling canvas (literally) for campaigns (“Relocation planner”, “First-time buyer guide”).
-- Keeps engineering lift low: reuse Canvas’ LLM orchestration; main work is mapping new signals to PropertyGuru filters + copy.
+## Success metrics
+- ≥60% of seekers complete the guided flow within two minutes.
+- Saved-search creation rate lifts vs. control by 15% for experiment cohorts.
+- Ops dashboard shows <10% manual overrides on generated copy after week one (evidence prompts are solid).
 
 ## Next steps
-1. Swap prompt instructions + signal extractors to PropertyGuru taxonomy.
-2. Prototype the output schema → connect to PropertyGuru search URL builder.
-3. User test with 5 seekers; measure “saved search created” & “listings viewed” vs. control.
+1. Implement the PropertyGuru signal schema + constants (Ticket 1_PG).
+2. Build the prompt-aligned extractor and test suite (Ticket 2_PG).
+3. Swap prompt/template assets and add golden fixtures (Ticket 3_PG).
+4. Ship payload mapper + drawer knobs (Tickets 4_PG, 5_PG).
+5. Instrument telemetry dashboards to monitor signal accuracy and plan adoption.
 
-Quick experiment, but promising path from messy browsing to confident discovery.
+Canvas for seekers stays scrappy, but pairing rule-based guardrails with LLM intelligence is how we deliver “guided discovery” instead of another filter wizard.

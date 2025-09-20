@@ -22,7 +22,7 @@ export interface BuildPromptSignalsOptions {
 }
 
 export interface PromptSignalSummary {
-  key: keyof PromptSignals;
+  key: string;
   value: unknown;
   source: PromptSignalSource;
   confidence: number;
@@ -69,7 +69,7 @@ export function summarizePromptSignals(signals: PromptSignals): PromptSignalSumm
     keyof PromptSignals,
     PromptSignalValue<unknown>,
   ]>).map(([key, entry]) => ({
-    key,
+    key: key as string,
     value: entry.value,
     source: entry.metadata.source,
     confidence: clampConfidence(entry.metadata.confidence),

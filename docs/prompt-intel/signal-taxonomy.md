@@ -2,6 +2,8 @@
 
 This taxonomy enumerates the prompt-derived signals required for Phase 4 personalization. Each signal is defined with canonical naming, allowed values, and sourcing expectations so downstream systems (extractors, scoring, telemetry, and UX) can stay aligned.
 
+> **PropertyGuru preset:** The seeker-first signals live in `src/lib/types/property-guru.ts` with canonical enums under `src/lib/constants/property-guru.ts`. New tickets should import from those modules instead of introducing magic strings.
+
 ## Summary Table
 | Signal | Canonical Key | Type | Value Domain | Primary Source | Compliance Notes |
 | --- | --- | --- | --- | --- | --- |

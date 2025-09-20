@@ -77,6 +77,16 @@ export {
 } from './llm';
 
 // ============================================================================
+// PropertyGuru preset constants
+// ============================================================================
+export {
+  PROPERTY_GURU_PROPERTY_TYPES,
+  PROPERTY_GURU_LIFESTYLE_CUES,
+  PROPERTY_GURU_TONE_PRESETS,
+  PROPERTY_GURU_MOVE_IN_HORIZONS,
+} from './property-guru';
+
+// ============================================================================
 // Application-wide Constants
 // ============================================================================
 
