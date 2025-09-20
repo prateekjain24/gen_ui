@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#eff6ff" />
+      <stop offset="100%" stop-color="#ffffff" />
+    </linearGradient>
+    <style>
+      text { font-family: "Inter", "Helvetica", "Arial", sans-serif; }
+      .title { font-size: 28px; font-weight: 700; fill: #111827; }
+      .caption { font-size: 18px; fill: #1e40af; }
+      .label { font-size: 16px; font-weight: 600; fill: #1f2937; }
+      .body { font-size: 14px; fill: #1f2937; }
+      .badge { font-size: 12px; fill: #1d4ed8; font-weight: 600; letter-spacing: 1px; }
+      .callout { font-size: 15px; font-weight: 600; fill: #2563eb; }
+      .callout-text { font-size: 13px; fill: #1d4ed8; }
+    </style>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)" />
+  <rect x="900" y="80" width="560" height="720" rx="28" fill="#ffffff" stroke="#dbeafe"/>
+  <rect x="920" y="120" width="520" height="120" rx="18" fill="#dbeafe" stroke="#bfdbfe"/>
+  <text x="940" y="160" class="title">Personalized plan applied</text>
+  <text x="940" y="198" class="caption">Overrides show AI-sourced decisions and rationale callouts.</text>
+  <rect x="920" y="260" width="520" height="160" rx="18" fill="#f8fafc" stroke="#cbd5f5"/>
+  <text x="940" y="300" class="label">Signals merged from AI + keyword</text>
+  <text x="940" y="332" class="body">• Industry: Fintech (confidence 0.64)</text>
+  <text x="940" y="360" class="body">• Compliance: SOX, audit (confidence 0.57)</text>
+  <text x="940" y="388" class="body">• Approvals: Multi stage (confidence 0.61)</text>
+  <rect x="920" y="440" width="520" height="180" rx="18" fill="#f0fdf4" stroke="#bbf7d0"/>
+  <text x="940" y="478" class="label">Knob adjustments</text>
+  <text x="940" y="510" class="body">Approval chain length → <tspan fill="#047857" font-weight="700">3 approvers</tspan></text>
+  <text x="940" y="538" class="body">Integration mode → <tspan fill="#047857" font-weight="700">Custom stack (ServiceNow)</tspan></text>
+  <text x="940" y="566" class="body">Invite strategy → <tspan fill="#047857" font-weight="700">Staggered after compliance</tspan></text>
+  <rect x="920" y="640" width="520" height="140" rx="18" fill="#eef2ff" stroke="#c7d2fe"/>
+  <text x="940" y="676" class="label">Preview</text>
+  <text x="940" y="708" class="body">CTA "Share with steering group" echoes personalized helper copy.</text>
+  <rect x="1030" y="452" width="120" height="28" rx="14" fill="#d1fae5" stroke="#34d399"/>
+  <text x="1040" y="472" class="badge">AI ADJUSTED</text>
+  <rect x="240" y="140" width="400" height="160" rx="22" fill="#2563eb" opacity="0.14"/>
+  <text x="260" y="190" class="callout">1. Explainable personalization</text>
+  <text x="260" y="220" class="callout-text">Rationale text mirrors AI badge copy for reviewer context.</text>
+  <line x1="620" y1="210" x2="920" y2="320" stroke="#2563eb" stroke-width="2" stroke-dasharray="5 5"/>
+  <rect x="220" y="360" width="420" height="200" rx="22" fill="#059669" opacity="0.12"/>
+  <text x="240" y="410" class="callout" fill="#065f46">2. Compliance callout</text>
+  <text x="240" y="440" class="callout-text" fill="#047857">Highlights SOX + audit combo driving stricter approvals.</text>
+  <line x1="620" y1="440" x2="920" y2="520" stroke="#047857" stroke-width="2" stroke-dasharray="6 6"/>
+  <rect x="260" y="620" width="360" height="200" rx="22" fill="#7c3aed" opacity="0.14"/>
+  <text x="280" y="670" class="callout" fill="#5b21b6">3. Helper copy</text>
+  <text x="280" y="702" class="callout-text" fill="#5b21b6">Narrates new CTA + helper text so PMs can storyboard review.</text>
+  <line x1="580" y1="700" x2="920" y2="700" stroke="#5b21b6" stroke-width="2" stroke-dasharray="4 6"/>
+</svg>
