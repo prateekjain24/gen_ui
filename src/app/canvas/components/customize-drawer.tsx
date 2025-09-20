@@ -31,9 +31,10 @@ interface CustomizeDrawerProps {
     helperText?: string;
     primaryCta?: string;
   };
+  onKnobChange?: (state: DrawerKnobState) => void;
 }
 
-interface DrawerKnobState {
+export interface DrawerKnobState {
   approvalChainLength: number;
   integrationMode: string;
   copyTone: string;
@@ -64,7 +65,7 @@ const isSameKnobState = (a: DrawerKnobState, b: DrawerKnobState): boolean =>
   a.copyTone === b.copyTone &&
   a.inviteStrategy === b.inviteStrategy;
 
-const DEFAULT_KNOB_STATE: DrawerKnobState = {
+export const DEFAULT_KNOB_STATE: DrawerKnobState = {
   approvalChainLength: 1,
   integrationMode: "multi_tool",
   copyTone: "collaborative",
@@ -190,7 +191,7 @@ const confidenceClass = (confidence: number): string => {
   return "bg-rose-100 text-rose-700";
 };
 
-const formatCta = (inviteStrategy: DrawerKnobState["inviteStrategy"], primaryCta?: string): string => {
+export const formatCta = (inviteStrategy: DrawerKnobState["inviteStrategy"], primaryCta?: string): string => {
   if (primaryCta) {
     return primaryCta;
   }
@@ -215,7 +216,7 @@ const getFocusableElements = (node: HTMLElement | null): HTMLElement[] => {
   return Array.from(node.querySelectorAll<HTMLElement>(focusableSelectors.join(",")));
 };
 
-const formatPreviewHelper = (state: DrawerKnobState, helper?: string): string => {
+export const formatPreviewHelper = (state: DrawerKnobState, helper?: string): string => {
   if (helper?.trim()) {
     return helper.trim();
   }
@@ -224,7 +225,7 @@ const formatPreviewHelper = (state: DrawerKnobState, helper?: string): string =>
   ).toLowerCase()} integrations, and require ${state.approvalChainLength} approval${state.approvalChainLength === 1 ? "" : "s"}.`;
 };
 
-const inviteCaption = (state: DrawerKnobState): string =>
+export const inviteCaption = (state: DrawerKnobState): string =>
   state.inviteStrategy === "immediate"
     ? "Invitations are sent as soon as approvals complete."
     : "Invitations will be staggered after foundational steps are done.";
@@ -236,11 +237,13 @@ export function CustomizeDrawer({
   promptSignals,
   knobOverrides,
   previewCopy,
+  onKnobChange,
 }: CustomizeDrawerProps): React.ReactElement | null {
   const drawerRef = React.useRef<HTMLDivElement>(null);
   const [knobState, setKnobState] = React.useState<DrawerKnobState>(() => formatKnobState(knobOverrides));
   const [history, setHistory] = React.useState<DrawerKnobState[]>([]);
   const [toast, setToast] = React.useState<{ id: number; message: string } | null>(null);
+  const lastNotifiedState = React.useRef<DrawerKnobState | null>(null);
 
   const normalizedRecipeId = React.useMemo(() => recipeId?.trim() ?? "", [recipeId]);
 
@@ -327,6 +330,7 @@ export function CustomizeDrawer({
           if (previousValue !== nextValue) {
             emitPlanEdit(controlId, previousValue, nextValue);
           }
+
         }
 
         return next;
@@ -337,7 +341,13 @@ export function CustomizeDrawer({
 
   React.useEffect(() => {
     if (open) {
-      setKnobState(formatKnobState(knobOverrides));
+      setKnobState(prev => {
+        const next = formatKnobState(knobOverrides);
+        if (isSameKnobState(prev, next)) {
+          return prev;
+        }
+        return next;
+      });
       setHistory([]);
     }
   }, [open, knobOverrides]);
@@ -417,6 +427,21 @@ export function CustomizeDrawer({
     emitPlanEdit("reset", knobState, baselineState);
     showToast("Reset to baseline settings");
   }, [emitPlanEdit, knobState, showToast]);
+
+  React.useEffect(() => {
+    if (!open) {
+      lastNotifiedState.current = null;
+      return;
+    }
+    if (!onKnobChange) {
+      return;
+    }
+    if (lastNotifiedState.current && isSameKnobState(lastNotifiedState.current, knobState)) {
+      return;
+    }
+    lastNotifiedState.current = knobState;
+    onKnobChange(knobState);
+  }, [knobState, onKnobChange, open]);
 
   if (!open) {
     return null;

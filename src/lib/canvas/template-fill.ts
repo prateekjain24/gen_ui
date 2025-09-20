@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { generateText } from "ai";
+import { jsonrepair } from "jsonrepair";
 
 import type { CanvasPersona, CanvasRecipeId } from "@/lib/canvas/recipes";
 import { validateTemplateSlots, type SlotValidationIssue } from "@/lib/canvas/template-validator";
@@ -348,6 +349,11 @@ const parseTemplateResponse = (raw: string | null): Record<TemplateId, Record<st
     return directParse;
   }
 
+  const repairedWithLibrary = attemptRepairWithLibrary(cleaned);
+  if (repairedWithLibrary) {
+    return repairedWithLibrary;
+  }
+
   const repaired = repairJson(cleaned);
   if (repaired) {
     return repaired;
@@ -358,6 +364,103 @@ const parseTemplateResponse = (raw: string | null): Record<TemplateId, Record<st
 };
 
 const repairJson = (input: string): Record<TemplateId, Record<string, string>> | null => {
+  const normalized = normalizeJsonInput(input);
+  const attempts: string[] = [];
+  const enqueue = (candidate: string | null | undefined) => {
+    if (!candidate) {
+      return;
+    }
+    const trimmed = candidate.trim();
+    if (!trimmed) {
+      return;
+    }
+    if (!attempts.includes(trimmed)) {
+      attempts.push(trimmed);
+    }
+  };
+
+  const balanced = trimToBalancedStructure(normalized);
+  enqueue(normalized);
+  enqueue(closeDelimiters(normalized));
+  enqueue(balanced);
+  if (balanced) {
+    enqueue(closeDelimiters(balanced));
+  }
+
+  for (const candidate of attempts) {
+    try {
+      const parsed = JSON.parse(candidate) as Record<string, Record<string, string>>;
+      return parsed as Record<TemplateId, Record<string, string>>;
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+};
+
+const attemptRepairWithLibrary = (input: string): Record<TemplateId, Record<string, string>> | null => {
+  try {
+    const repaired = jsonrepair(input);
+    const parsed = JSON.parse(repaired) as Record<string, Record<string, string>>;
+    return parsed as Record<TemplateId, Record<string, string>>;
+  } catch {
+    return null;
+  }
+};
+
+const normalizeJsonInput = (value: string): string =>
+  value
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\\u201[cd]/gi, '"');
+
+const trimToBalancedStructure = (value: string): string | null => {
+  let depth = 0;
+  let inString = false;
+  let isEscaped = false;
+  let lastBalancedIndex = -1;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+
+    if (isEscaped) {
+      isEscaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      isEscaped = inString;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) {
+      continue;
+    }
+
+    if (char === '{' || char === '[') {
+      depth += 1;
+    } else if (char === '}' || char === ']') {
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) {
+        lastBalancedIndex = index + 1;
+      }
+    }
+  }
+
+  if (lastBalancedIndex > 0 && lastBalancedIndex < value.length) {
+    return value.slice(0, lastBalancedIndex);
+  }
+
+  return depth === 0 ? value : closeDelimiters(value);
+};
+
+const closeDelimiters = (input: string): string => {
   let candidate = input;
 
   const count = (value: string, pattern: RegExp) => (value.match(pattern) ?? []).length;
@@ -377,12 +480,7 @@ const repairJson = (input: string): Record<TemplateId, Record<string, string>> |
     candidate += '"';
   }
 
-  try {
-    const parsed = JSON.parse(candidate) as Record<string, Record<string, string>>;
-    return parsed as Record<TemplateId, Record<string, string>>;
-  } catch {
-    return null;
-  }
+  return candidate;
 };
 
 const summarizeSignals = (signals: PromptSignals) => ({

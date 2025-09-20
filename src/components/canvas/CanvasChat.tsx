@@ -3,7 +3,13 @@
 import { Loader2, Settings2 } from "lucide-react";
 import * as React from "react";
 
-import { CustomizeDrawer } from "@/app/canvas/components/customize-drawer";
+import {
+  CustomizeDrawer,
+  type DrawerKnobState,
+  formatCta as formatCustomizeCta,
+  formatPreviewHelper as formatCustomizeHelper,
+  inviteCaption as formatCustomizeInviteCaption,
+} from "@/app/canvas/components/customize-drawer";
 import { PersonaBadge, PromptSignalsDebugPanel, ReasoningChip } from "@/components/canvas";
 import { FormRenderer } from "@/components/form/FormRenderer";
 import { Button } from "@/components/ui/button";
@@ -184,6 +190,157 @@ const mapApprovalDepthToToggleValue = (depth: ApprovalChainDepth | undefined): s
   }
   return depth === "single" ? "disabled" : "required";
 };
+
+const MANUAL_OVERRIDE_RATIONALE = "Adjusted in Customize experience drawer.";
+
+const INTEGRATION_MODE_HELPERS: Record<string, string> = {
+  multi_tool: "Highlight the collaboration tools your team already uses.",
+  single_tool: "Focus on your core system today—you can add more later.",
+  custom: "Mix and match integrations to tailor this workspace.",
+  lightweight: "Keep integrations optional until the team is ready.",
+  client_portal: "Surface shared client folders and handoffs first.",
+  governed: "Limit integrations to vetted systems with guardrails.",
+};
+
+const mapInviteStrategyToOverrideValue = (strategy: DrawerKnobState["inviteStrategy"]): string =>
+  strategy === "staggered" ? "staged" : strategy;
+
+const normalizeApprovalLength = (
+  value: number,
+  definition: RecipeKnobDefinition | undefined
+): number => {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  const numeric = Math.max(0, Math.round(value));
+  if (!definition || definition.type !== "number") {
+    return numeric;
+  }
+  const min = typeof definition.min === "number" ? definition.min : Number.NEGATIVE_INFINITY;
+  const max = typeof definition.max === "number" ? definition.max : Number.POSITIVE_INFINITY;
+  return Math.min(Math.max(numeric, min), max);
+};
+
+const deriveIntegrationHelper = (mode: string | undefined, fallback?: string): string | undefined => {
+  if (!mode) {
+    return fallback;
+  }
+  return INTEGRATION_MODE_HELPERS[mode] ?? fallback;
+};
+
+const applyKnobOverridesToPlan = (plan: CanvasPlanState, state: DrawerKnobState): CanvasPlanState => {
+  const recipe = getRecipe(plan.recipeId);
+  const knobDefinitions = recipe.knobs ?? {};
+
+  const normalizedApproval = normalizeApprovalLength(state.approvalChainLength, knobDefinitions.approvalChainLength);
+  const canonicalInviteStrategy = mapInviteStrategyToOverrideValue(state.inviteStrategy);
+
+  const overrides: RecipeKnobOverrides = { ...plan.personalization.overrides };
+
+  const setOverride = (id: RecipeKnobId, value: string | number) => {
+    const definition = knobDefinitions[id];
+    const defaultValue = definition?.defaultValue;
+    let changed = true;
+    if (definition?.type === "number" && typeof defaultValue === "number") {
+      changed = defaultValue !== value;
+    } else if (definition?.type === "enum" && typeof defaultValue === "string") {
+      changed = defaultValue !== value;
+    }
+    overrides[id] = {
+      value,
+      rationale: MANUAL_OVERRIDE_RATIONALE,
+      changedFromDefault: changed,
+    };
+  };
+
+  setOverride("approvalChainLength", normalizedApproval);
+  setOverride("integrationMode", state.integrationMode);
+  setOverride("copyTone", state.copyTone);
+  setOverride("inviteStrategy", canonicalInviteStrategy);
+
+  const updatedPersonalization: RecipePersonalizationResult = {
+    ...plan.personalization,
+    overrides,
+  };
+
+  const helperText = formatCustomizeHelper(state, undefined);
+  const primaryCta = formatCustomizeCta(state.inviteStrategy, undefined);
+
+  const updatedTemplateCopy: TemplateCopyPayload = {
+    ...plan.templateCopy,
+    helperText,
+    primaryCta,
+  };
+
+  const response: CanvasPlanResponse = {
+    recipeId: plan.recipeId,
+    persona: plan.persona,
+    intentTags: plan.intentTags,
+    confidence: plan.confidence,
+    reasoning: plan.reasoning,
+    decisionSource: plan.decisionSource,
+    promptSignals: plan.promptSignals,
+    personalization: updatedPersonalization,
+    templateCopy: updatedTemplateCopy,
+  };
+
+  const attributions = buildPlanAttributions({
+    recipe,
+    overrides,
+    fallback: updatedPersonalization.fallback,
+    promptSignals: plan.promptSignals,
+    templateIssues: updatedTemplateCopy.issues,
+  });
+
+  const fieldsWithAttribution = recipe.fields.map(field => {
+    const attribution = attributions.fields[field.id];
+    return attribution ? { ...field, aiAttribution: attribution } : { ...field };
+  });
+
+  let formPlan = buildFormPlan(recipe, response, {
+    fields: fieldsWithAttribution,
+    titleAttribution: attributions.title,
+    descriptionAttribution: attributions.description,
+    primaryCtaAttribution: attributions.primaryCta,
+  });
+
+  const updatedFields = formPlan.step.fields.map(field => {
+    if (field.kind === "admin_toggle" && field.id === FIELD_IDS.ADMIN_CONTROLS) {
+      const value = normalizedApproval > 1 ? "required" : "disabled";
+      return value === field.value ? field : { ...field, value };
+    }
+    if (field.kind === "integration_picker" && field.id === FIELD_IDS.PREFERRED_INTEGRATIONS) {
+      const helper = deriveIntegrationHelper(state.integrationMode, field.helperText);
+      return helper === field.helperText ? field : { ...field, helperText: helper };
+    }
+    if (field.kind === "teammate_invite" && field.id === FIELD_IDS.TEAM_INVITES) {
+      const helper = formatCustomizeInviteCaption(state);
+      return helper === field.helperText ? field : { ...field, helperText: helper };
+    }
+    return field;
+  });
+
+  formPlan = {
+    ...formPlan,
+    step: {
+      ...formPlan.step,
+      fields: updatedFields,
+      primaryCta: {
+        ...formPlan.step.primaryCta,
+        label: primaryCta,
+      },
+    },
+  };
+
+  return {
+    ...plan,
+    personalization: updatedPersonalization,
+    templateCopy: updatedTemplateCopy,
+    formPlan,
+    fields: updatedFields,
+  };
+};
+
 
 interface AttributionBuildContext {
   recipe: CanvasRecipe;
@@ -618,6 +775,15 @@ export function CanvasChat({ personalizationEnabled = true }: CanvasChatProps): 
     [submitMessage]
   );
 
+  const handleKnobStateChange = React.useCallback((state: DrawerKnobState) => {
+    setPlan(current => {
+      if (!current) {
+        return current;
+      }
+      return applyKnobOverridesToPlan(current, state);
+    });
+  }, []);
+
   const previewItems = React.useMemo(() => {
     if (!plan) {
       return [] as Array<{ id: string; label: string; description: string }>;
@@ -845,6 +1011,7 @@ export function CanvasChat({ personalizationEnabled = true }: CanvasChatProps): 
           promptSignals={plan?.promptSignals}
           knobOverrides={plan?.personalization.overrides}
           previewCopy={plan?.templateCopy}
+          onKnobChange={handleKnobStateChange}
         />
       ) : null}
     </main>
