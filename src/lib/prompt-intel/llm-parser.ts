@@ -1,6 +1,7 @@
 import { generateText } from 'ai';
 import { z } from 'zod';
 
+import { TOOL_LOOKUP } from './tool-definitions';
 import type {
   ApprovalChainDepth,
   ConstraintSignal,
@@ -74,9 +75,19 @@ const approvalDepthSchema = z
   .enum(['single', 'dual', 'multi', 'unknown'])
   .transform(value => value as ApprovalChainDepth);
 
+const normalizeToolName = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 const toolSchema = z
-  .enum(['Slack', 'Jira', 'Notion', 'Salesforce', 'Asana', 'ServiceNow', 'Zendesk', 'Other'])
-  .transform(value => value as ToolIdentifier);
+  .string()
+  .transform<ToolIdentifier>(value => {
+    const normalized = normalizeToolName(value);
+    return TOOL_LOOKUP[normalized] ?? 'Other';
+  });
 
 const toolArraySchema = z
   .array(toolSchema)

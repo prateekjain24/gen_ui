@@ -54,7 +54,7 @@ describe('fetchSignalsFromLLM', () => {
 
   it('returns structured signals when LLM response is valid', async () => {
     generateText.mockResolvedValue({
-      text: '```json\n{"teamSizeBracket": {"value": "10-24", "confidence": 0.82}, "tools": {"value": ["Slack", "Salesforce", "Slack"], "confidence": 0.7, "notes": "explicit mention"}, "constraints": {"value": {"timeline": "rush", "notes": "ASAP launch"}}, "copyTone": {"value": "trusted-advisor"}}\n```',
+      text: '```json\n{"teamSizeBracket": {"value": "10-24", "confidence": 0.82}, "tools": {"value": ["Slack", "Salesforce", "Slack", "Teams", "Linear"], "confidence": 0.7, "notes": "explicit mention"}, "constraints": {"value": {"timeline": "rush", "notes": "ASAP launch"}}, "copyTone": {"value": "trusted-advisor"}}\n```',
       usage: { totalTokens: 120 },
     });
 
@@ -74,7 +74,7 @@ describe('fetchSignalsFromLLM', () => {
     expect(result.teamSizeBracket?.metadata.source).toBe('llm');
     expect(result.teamSizeBracket?.metadata.confidence).toBeCloseTo(0.82, 5);
 
-    expect(result.tools?.value).toEqual(['Slack', 'Salesforce']);
+    expect(result.tools?.value).toEqual(['Slack', 'Salesforce', 'Microsoft Teams', 'Linear']);
     expect(result.tools?.metadata.notes).toContain('explicit mention');
 
     expect(result.constraints?.value.timeline).toBe('rush');

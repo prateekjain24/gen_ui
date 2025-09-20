@@ -1,3 +1,4 @@
+import { TOOL_DEFINITIONS } from './tool-definitions';
 import type {
   CopyTone,
   ComplianceTag,
@@ -20,16 +21,13 @@ interface NormalizedPrompt {
   sanitized: string;
 }
 
-const TOOL_KEYWORDS: Record<ToolIdentifier, string[]> = {
-  Slack: ['slack'],
-  Jira: ['jira'],
-  Notion: ['notion'],
-  Salesforce: ['salesforce', 'sales force'],
-  Asana: ['asana'],
-  ServiceNow: ['servicenow', 'service now'],
-  Zendesk: ['zendesk'],
-  Other: [],
-};
+const TOOL_KEYWORDS: Record<ToolIdentifier, string[]> = TOOL_DEFINITIONS.reduce(
+  (accumulator, definition) => {
+    accumulator[definition.id] = definition.keywords;
+    return accumulator;
+  },
+  {} as Record<ToolIdentifier, string[]>
+);
 
 const COMPLIANCE_KEYWORDS: Record<Exclude<ComplianceTag, 'other'>, string[]> = {
   SOC2: ['soc2', 'soc 2'],

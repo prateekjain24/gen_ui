@@ -44,6 +44,22 @@ describe('extractSignalsFromKeywords', () => {
     expect(result.tools?.value).toEqual(['Slack']);
   });
 
+  it('detects a broad set of collaboration and analytics tools', () => {
+    const prompt =
+      'We coordinate work in Microsoft Teams, track engineering in Linear, and review dashboards in Mixpanel and Snowflake.';
+
+    const result = extractSignalsFromKeywords(prompt);
+
+    expect(result.tools?.value).toEqual(
+      expect.arrayContaining([
+        'Microsoft Teams',
+        'Linear',
+        'Mixpanel',
+        'Snowflake',
+      ])
+    );
+  });
+
   it('returns an empty partial when no keywords are detected', () => {
     const result = extractSignalsFromKeywords('Tell me more about your product features.');
     expect(result).toEqual({});
